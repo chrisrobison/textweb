@@ -1,12 +1,12 @@
 /**
- * AgentView HTTP Server - REST API for web rendering and interaction
+ * TextWeb HTTP Server - REST API for web rendering and interaction
  */
 
 const http = require('http');
 const url = require('url');
 const { AgentBrowser } = require('./browser');
 
-class AgentViewServer {
+class TextWebServer {
   constructor(options = {}) {
     this.options = {
       cols: options.cols || 100,
@@ -489,7 +489,7 @@ class AgentViewServer {
  * Create HTTP server instance
  */
 function createServer(options = {}) {
-  const server = new AgentViewServer(options);
+  const server = new TextWebServer(options);
   
   return http.createServer((req, res) => {
     server.handleRequest(req, res).catch(error => {
@@ -501,4 +501,4 @@ function createServer(options = {}) {
   });
 }
 
-module.exports = { createServer, AgentViewServer };
+module.exports = { createServer, TextWebServer };

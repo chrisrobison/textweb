@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * AgentView Job Application Agent
+ * TextWeb Job Application Agent
  * 
  * Fills out job applications using text-grid rendering instead of screenshots.
  * Handles: LinkedIn Easy Apply, Greenhouse, Workday, Lever, Ashby, generic forms.
@@ -529,7 +529,7 @@ async function main() {
 
 function printHelp() {
   console.log(`
-AgentView Job Applicator — Fill out job applications without screenshots
+TextWeb Job Applicator — Fill out job applications without screenshots
 
 Usage:
   node apply.js <url>                     Apply to a single job

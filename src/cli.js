@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * AgentView CLI - Command-line interface for text-grid web rendering
+ * TextWeb CLI - Command-line interface for text-grid web rendering
  */
 
 const { AgentBrowser } = require('./browser');
@@ -75,13 +75,13 @@ function parseArgs() {
 // Show help message
 function showHelp() {
   console.log(`
-AgentView - Text-grid web renderer for AI agents
+TextWeb - Text-grid web renderer for AI agents
 
 USAGE:
-  agentview <url>                    Render page and print to console
-  agentview --interactive <url>      Start interactive REPL mode
-  agentview --json <url>             Output as JSON (view + elements)
-  agentview --serve                  Start HTTP API server
+  textweb <url>                    Render page and print to console
+  textweb --interactive <url>      Start interactive REPL mode
+  textweb --json <url>             Output as JSON (view + elements)
+  textweb --serve                  Start HTTP API server
 
 OPTIONS:
   --cols, -c <number>                Grid width in characters (default: 100)
@@ -93,10 +93,10 @@ OPTIONS:
   --help, -h                         Show this help message
 
 EXAMPLES:
-  agentview https://example.com
-  agentview --interactive https://github.com
-  agentview --json --cols 120 https://news.ycombinator.com
-  agentview --serve --port 8080
+  textweb https://example.com
+  textweb --interactive https://github.com
+  textweb --json --cols 120 https://news.ycombinator.com
+  textweb --serve --port 8080
 
 INTERACTIVE COMMANDS:
   click <ref>                        Click element by reference number
@@ -163,7 +163,7 @@ async function interactive(url, options) {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: 'agentview> '
+    prompt: 'textweb> '
   });
 
   let result = null;
@@ -363,7 +363,7 @@ Interactive Commands:
 
 // Start HTTP server
 async function serve(options) {
-  console.log(`Starting AgentView HTTP server on port ${options.port}...`);
+  console.log(`Starting TextWeb HTTP server on port ${options.port}...`);
   
   const server = createServer({
     cols: options.cols,
@@ -371,7 +371,7 @@ async function serve(options) {
   });
   
   server.listen(options.port, () => {
-    console.log(`AgentView server running at http://localhost:${options.port}`);
+    console.log(`TextWeb server running at http://localhost:${options.port}`);
     console.log(`\\nAPI Endpoints:`);
     console.log(`  POST /navigate   - Navigate to URL`);
     console.log(`  POST /click      - Click element`);

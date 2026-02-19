@@ -1,8 +1,8 @@
-# AgentView
+# TextWeb
 
 **A text-grid web renderer for AI agents — see the web without screenshots.**
 
-Instead of taking expensive screenshots and piping them through vision models, AgentView renders web pages as structured text grids that LLMs can reason about natively. Full JavaScript execution, spatial layout preserved, interactive elements annotated.
+Instead of taking expensive screenshots and piping them through vision models, TextWeb renders web pages as structured text grids that LLMs can reason about natively. Full JavaScript execution, spatial layout preserved, interactive elements annotated.
 
 ## Why?
 
@@ -11,7 +11,7 @@ Instead of taking expensive screenshots and piping them through vision models, A
 | Screenshot + Vision | ~1MB | Vision model ($$$) | Slow | Pixel-level |
 | Accessibility Tree | ~5KB | Nothing | Fast | ❌ Lost |
 | Raw HTML | ~100KB+ | Nothing | Fast | ❌ Lost |
-| **AgentView** | **~2-5KB** | **Nothing** | **Fast** | **✅ Preserved** |
+| **TextWeb** | **~2-5KB** | **Nothing** | **Fast** | **✅ Preserved** |
 
 ## How It Works
 
@@ -31,7 +31,7 @@ Instead of taking expensive screenshots and piping them through vision models, A
 └─────────────────────────────────────────────┘
 ```
 
-The browser renders the page normally. AgentView extracts every visible element's position, size, text, and interactivity — then maps it all onto a character grid. Interactive elements get reference numbers like `[0]`, `[1]` that agents can use to click, type, or select.
+The browser renders the page normally. TextWeb extracts every visible element's position, size, text, and interactivity — then maps it all onto a character grid. Interactive elements get reference numbers like `[0]`, `[1]` that agents can use to click, type, or select.
 
 ## Example Output
 
@@ -39,7 +39,7 @@ The browser renders the page normally. AgentView extracts every visible element'
 ═══ HACKER NEWS ══════════════════════════════════════
 [0]Hacker News  [1]new  [2]past  [3]comments  [4]ask  [5]show  [6]jobs  [7]submit
 
- 1. [8]Show HN: AgentView - text-grid browser for AI agents (github.com)
+ 1. [8]Show HN: TextWeb - text-grid browser for AI agents (github.com)
     142 points by chrisrobison 3 hours ago | [9]89 comments
  2. [10]Why LLMs don't need screenshots to browse the web
     87 points by somebody 5 hours ago | [11]34 comments
@@ -54,7 +54,7 @@ The browser renders the page normally. AgentView extracts every visible element'
 ## Install
 
 ```bash
-npm install -g agentview
+npm install -g textweb
 npx playwright install chromium
 ```
 
@@ -62,28 +62,28 @@ npx playwright install chromium
 
 ```bash
 # Render a page
-agentview https://news.ycombinator.com
+textweb https://news.ycombinator.com
 
 # Interactive mode
-agentview -i https://github.com
-agentview> click 3
-agentview> type 7 search query
-agentview> scroll down
-agentview> refs
-agentview> quit
+textweb -i https://github.com
+textweb> click 3
+textweb> type 7 search query
+textweb> scroll down
+textweb> refs
+textweb> quit
 
 # JSON output (for piping to agents)
-agentview -j https://example.com
+textweb -j https://example.com
 
 # Custom grid size
-agentview --cols 80 --rows 24 https://example.com
+textweb --cols 80 --rows 24 https://example.com
 ```
 
 ## HTTP API
 
 ```bash
 # Start the server
-agentview --serve 3000
+textweb --serve 3000
 
 # Navigate
 curl -X POST http://localhost:3000/navigate \
@@ -109,7 +109,7 @@ curl http://localhost:3000/snapshot
 ## Programmatic Usage
 
 ```javascript
-const { AgentBrowser } = require('agentview');
+const { AgentBrowser } = require('textweb');
 
 const browser = new AgentBrowser({ cols: 120, rows: 40 });
 
