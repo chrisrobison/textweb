@@ -1,0 +1,24 @@
+{
+  "name": "agentview",
+  "version": "0.1.0",
+  "description": "A text-grid web renderer for AI agents — see the web without screenshots",
+  "main": "src/browser.js",
+  "bin": {
+    "agentview": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "serve": "node src/server.js",
+    "test": "node test/basic.js"
+  },
+  "keywords": ["ai", "agent", "browser", "text", "renderer", "llm", "headless", "accessibility"],
+  "author": "Christopher Robison <cdr@cdr2.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrisrobison/agentview"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}
