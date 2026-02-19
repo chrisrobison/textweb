@@ -1,0 +1,154 @@
+{
+  "name": "textweb",
+  "description": "Text-grid web browser for AI agents. Renders pages as structured text with interactive element references instead of screenshots.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_navigate",
+        "description": "Navigate to a URL and render the page as a structured text grid. Interactive elements are annotated with [ref] numbers. Returns the text view (~2-5KB) instead of a screenshot (~1MB). No vision model needed.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "The URL to navigate to"
+            }
+          },
+          "required": ["url"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_click",
+        "description": "Click an interactive element identified by its [ref] number from the text grid.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "integer",
+              "description": "Element reference number (e.g., 3 for [3])"
+            }
+          },
+          "required": ["ref"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_type",
+        "description": "Type text into an input field identified by its [ref] number. Replaces existing content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "integer",
+              "description": "Element reference number of the input field"
+            },
+            "text": {
+              "type": "string",
+              "description": "Text to enter into the field"
+            }
+          },
+          "required": ["ref", "text"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_select",
+        "description": "Select an option from a dropdown by its [ref] number.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "integer",
+              "description": "Element reference number of the dropdown"
+            },
+            "value": {
+              "type": "string",
+              "description": "Option value or visible text to select"
+            }
+          },
+          "required": ["ref", "value"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_scroll",
+        "description": "Scroll the current page. Returns the updated text grid.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": ["up", "down", "top"],
+              "description": "Scroll direction"
+            },
+            "amount": {
+              "type": "integer",
+              "description": "Pages to scroll (default: 1)",
+              "default": 1
+            }
+          },
+          "required": ["direction"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_snapshot",
+        "description": "Re-render the current page without navigating. Use after waiting for dynamic content.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_press",
+        "description": "Press a keyboard key (Enter, Tab, Escape, ArrowDown, etc.).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Key name (e.g., 'Enter', 'Tab', 'Escape')"
+            }
+          },
+          "required": ["key"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_upload",
+        "description": "Upload a file to a file input element.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "integer",
+              "description": "Element reference number of the file input"
+            },
+            "path": {
+              "type": "string",
+              "description": "Absolute file path to upload"
+            }
+          },
+          "required": ["ref", "path"]
+        }
+      }
+    }
+  ]
+}

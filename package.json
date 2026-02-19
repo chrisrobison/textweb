@@ -4,7 +4,8 @@
   "description": "A text-grid web renderer for AI agents — see the web without screenshots",
   "main": "src/browser.js",
   "bin": {
-    "textweb": "./src/cli.js"
+    "textweb": "./src/cli.js",
+    "textweb-mcp": "./mcp/index.js"
   },
   "scripts": {
     "start": "node src/cli.js",
