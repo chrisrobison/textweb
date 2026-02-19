@@ -34,7 +34,13 @@ class AgentBrowser {
   async navigate(url) {
     if (!this.page) await this.launch();
     this.scrollY = 0;
-    await this.page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    // Use domcontentloaded + a short settle, not networkidle (SPAs never go idle)
+    await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // Wait for network to settle or 3s max — whichever comes first
+    await Promise.race([
+      this.page.waitForLoadState('networkidle').catch(() => {}),
+      new Promise(r => setTimeout(r, 3000)),
+    ]);
     return await this.snapshot();
   }
 

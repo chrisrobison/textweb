@@ -139,7 +139,7 @@ async function render(url, options) {
       if (elCount > 0) {
         console.error(`\\nInteractive elements:`);
         for (const [ref, element] of Object.entries(result.elements || {})) {
-          console.error(`[${ref}] ${element.tagName}: ${element.textContent || '(no text)'}`);
+          console.error(`[${ref}] ${element.semantic || element.tag}: ${element.text || '(no text)'}`);
         }
       }
     }
@@ -312,7 +312,7 @@ Interactive Commands:
             if (result && Object.keys(result.elements || {}).length > 0) {
               console.log(`Interactive elements (${Object.keys(result.elements || {}).length}):`);
               for (const [ref, element] of Object.entries(result.elements || {})) {
-                console.log(`[${ref}] ${element.tagName}: ${element.textContent || '(no text)'}`);
+                console.log(`[${ref}] ${element.semantic || element.tag}: ${element.text || '(no text)'}`);
               }
             } else {
               console.log('No interactive elements found');
