@@ -226,6 +226,17 @@ Interactive Commands:
             }
             break;
             
+          case 'upload':
+            if (parts.length < 3) {
+              console.log('Usage: upload <ref> <filepath> [filepath2 ...]');
+            } else {
+              const ref = parseInt(parts[1]);
+              const files = parts.slice(2);
+              result = await browser.upload(ref, files);
+              console.log(result.view);
+            }
+            break;
+
           case 'scroll':
             if (parts.length < 2) {
               console.log('Usage: scroll <direction> [amount]');

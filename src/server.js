@@ -159,6 +159,12 @@ class AgentViewServer {
             return await this.handleSelect(req, res);
           }
           break;
+
+        case '/upload':
+          if (method === 'POST') {
+            return await this.handleUpload(req, res);
+          }
+          break;
           
         case '/snapshot':
           if (method === 'GET') {
@@ -345,6 +351,31 @@ class AgentViewServer {
       action: 'select',
       ref: body.ref,
       value: body.value,
+      view: result.view,
+      elements: result.elements,
+      meta: result.meta
+    });
+  }
+
+  async handleUpload(req, res) {
+    const body = await this.parseBody(req);
+    
+    if (typeof body.ref !== 'number') {
+      return this.sendError(res, 'Element reference (ref) is required');
+    }
+    if (!body.files) {
+      return this.sendError(res, 'files (string or array of file paths) is required');
+    }
+    if (!this.browser) {
+      return this.sendError(res, 'Browser not initialized. Navigate to a page first.');
+    }
+    
+    const result = await this.browser.upload(body.ref, body.files);
+    
+    this.sendJSON(res, {
+      success: true,
+      action: 'upload',
+      ref: body.ref,
       view: result.view,
       elements: result.elements,
       meta: result.meta

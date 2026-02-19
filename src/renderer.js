@@ -198,6 +198,7 @@ async function extractElements(page) {
         if (type === 'checkbox') semantic = 'checkbox';
         else if (type === 'radio') semantic = 'radio';
         else if (type === 'submit' || type === 'button') semantic = 'button';
+        else if (type === 'file') semantic = 'file';
         else semantic = 'input';
       }
       else if (tag === 'select') semantic = 'select';
@@ -341,6 +342,8 @@ function formatElement(el, ref, cols, startCol, charW) {
       return `[${ref}:${el.checked ? '●' : '○'}] ${el.text}`;
     case 'select':
       return `[${ref}:▼ ${el.text}]`;
+    case 'file':
+      return `[${ref}:📎 ${el.text || 'Choose file'}]`;
     case 'separator': {
       const width = Math.min(cols - startCol, Math.round(el.w / charW));
       return '─'.repeat(Math.max(3, width));

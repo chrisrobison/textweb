@@ -71,6 +71,13 @@ class AgentBrowser {
     return await this.snapshot();
   }
 
+  async upload(ref, filePaths) {
+    const el = this._getElement(ref);
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    await this.page.setInputFiles(el.selector, paths);
+    return await this.snapshot();
+  }
+
   async select(ref, value) {
     const el = this._getElement(ref);
     await this.page.selectOption(el.selector, value);
