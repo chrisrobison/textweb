@@ -4,18 +4,61 @@
  * Generates answers for freeform job application questions using
  * a local LLM (LM Studio) or remote API (OpenAI-compatible).
  * 
- * Default: LM Studio at localhost:1234 with Gemma 3 4B (zero cost)
+ * Configuration (in order of priority):
+ *   1. Config object passed to functions
+ *   2. Environment variables (TEXTWEB_LLM_URL, TEXTWEB_LLM_API_KEY, etc.)
+ *   3. .env file in project root or cwd
+ *   4. Defaults (LM Studio at localhost:1234)
+ * 
+ * Environment variables:
+ *   TEXTWEB_LLM_URL      - Base URL for OpenAI-compatible API (default: http://localhost:1234/v1)
+ *   TEXTWEB_LLM_API_KEY  - API key (optional for local LLMs)
+ *   TEXTWEB_LLM_MODEL    - Model name (default: google/gemma-3-4b)
+ *   TEXTWEB_LLM_MAX_TOKENS - Max tokens (default: 200)
+ *   TEXTWEB_LLM_TEMPERATURE - Temperature (default: 0.7)
+ *   TEXTWEB_LLM_TIMEOUT  - Request timeout in ms (default: 60000)
  */
 
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
+
+// Load .env file if present (lightweight, no dependency)
+function loadEnv() {
+  const candidates = [
+    path.join(process.cwd(), '.env'),
+    path.join(__dirname, '..', '.env'),
+  ];
+  for (const envPath of candidates) {
+    try {
+      const content = fs.readFileSync(envPath, 'utf8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx === -1) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        let val = trimmed.slice(eqIdx + 1).trim();
+        // Strip quotes
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (!process.env[key]) process.env[key] = val;
+      }
+      break; // only load first found
+    } catch (_) { /* no .env, that's fine */ }
+  }
+}
+loadEnv();
 
 const DEFAULT_CONFIG = {
-  baseUrl: 'http://localhost:1234/v1',
-  model: 'google/gemma-3-4b',
-  maxTokens: 200,
-  temperature: 0.7,
-  timeout: 60000,
+  baseUrl: process.env.TEXTWEB_LLM_URL || 'http://localhost:1234/v1',
+  apiKey: process.env.TEXTWEB_LLM_API_KEY || '',
+  model: process.env.TEXTWEB_LLM_MODEL || 'google/gemma-3-4b',
+  maxTokens: parseInt(process.env.TEXTWEB_LLM_MAX_TOKENS, 10) || 200,
+  temperature: parseFloat(process.env.TEXTWEB_LLM_TEMPERATURE) || 0.7,
+  timeout: parseInt(process.env.TEXTWEB_LLM_TIMEOUT, 10) || 60000,
 };
 
 // ─── Applicant Background (for prompt context) ─────────────────────────────

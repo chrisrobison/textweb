@@ -48,6 +48,26 @@ textweb --json https://example.com
 
 ~500 bytes. An LLM can read this, understand the layout, and say "click ref 9" to open the first link. No vision model needed.
 
+## LLM Configuration
+
+TextWeb's job application pipeline uses a local or remote LLM for freeform questions. Configure via `.env` file or environment variables:
+
+```bash
+cp .env.example .env
+# Edit .env with your settings
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TEXTWEB_LLM_URL` | `http://localhost:1234/v1` | OpenAI-compatible API endpoint |
+| `TEXTWEB_LLM_API_KEY` | *(empty)* | API key (optional for local LLMs) |
+| `TEXTWEB_LLM_MODEL` | `google/gemma-3-4b` | Model name |
+| `TEXTWEB_LLM_MAX_TOKENS` | `200` | Max response tokens |
+| `TEXTWEB_LLM_TEMPERATURE` | `0.7` | Sampling temperature |
+| `TEXTWEB_LLM_TIMEOUT` | `60000` | Request timeout (ms) |
+
+Works with LM Studio, Ollama, OpenAI, or any OpenAI-compatible endpoint. No API key needed for local models.
+
 ## Integration Options
 
 TextWeb works with any AI agent framework. Pick your integration:
