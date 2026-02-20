@@ -187,6 +187,29 @@ async function extractElements(page) {
         text = '---';
       }
 
+      // Resolve label for form elements
+      let label = '';
+      if (!isText && (tag === 'input' || tag === 'select' || tag === 'textarea')) {
+        // Strategy 1: <label for="id">
+        if (el.id) {
+          const labelEl = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+          if (labelEl) label = labelEl.textContent.trim().replace(/\s*\*\s*$/, '').trim();
+        }
+        // Strategy 2: aria-label
+        if (!label && el.getAttribute('aria-label')) {
+          label = el.getAttribute('aria-label');
+        }
+        // Strategy 3: wrapping <label>
+        if (!label) {
+          const parentLabel = el.closest('label');
+          if (parentLabel) label = parentLabel.textContent.trim().replace(/\s*\*\s*$/, '').trim();
+        }
+        // Strategy 4: name attribute as fallback
+        if (!label && el.name) {
+          label = el.name.replace(/[_\-\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+      }
+
       // Determine semantic type
       let semantic = 'text';
       const headingMatch = tag.match(/^h(\d)$/);
@@ -231,6 +254,7 @@ async function extractElements(page) {
 
       results.push({
         text,
+        label: label || '',
         tag,
         semantic,
         headingLevel: headingMatch ? parseInt(headingMatch[1]) : 0,
@@ -399,6 +423,7 @@ function renderGrid(elements, cols, charW, charH, scrollY = 0) {
           semantic: el.semantic,
           href: el.href,
           text: el.text,
+          label: el.label || '',
           x: el.x,
           y: el.y,
         };

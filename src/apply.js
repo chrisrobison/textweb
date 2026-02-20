@@ -54,8 +54,8 @@ const FIELD_PATTERNS = [
   { match: /e-?mail/i, value: () => PROFILE.email },
   { match: /phone|mobile|cell|telephone/i, value: () => PROFILE.phone },
   
-  // Location (exclude "email address" by requiring no "email" nearby)
-  { match: /^(?!.*e-?mail).*(city|location|address|zip|postal)/i, value: () => PROFILE.location },
+  // Location (exclude "email address" and yes/no questions that mention "location")
+  { match: /^(?!.*e-?mail)(?!.*authorized)(?!.*sponsor)(?!.*remote)(?!.*relocat).*(city|^location$|address|zip|postal)/i, value: () => PROFILE.location },
   
   // Links
   { match: /linkedin/i, value: () => PROFILE.linkedin },
@@ -65,12 +65,15 @@ const FIELD_PATTERNS = [
   // Work info
   { match: /current.*title|job.*title/i, value: () => PROFILE.currentTitle },
   { match: /current.*company|employer|organization/i, value: () => PROFILE.currentCompany },
-  { match: /years.*experience|experience.*years/i, value: () => PROFILE.yearsExperience },
+  { match: /^(?!.*do you have).*(?:years.*experience|experience.*years|how many years)/i, value: () => PROFILE.yearsExperience },
+  { match: /^do you have.*(?:years|experience)/i, value: () => 'Yes' },
   
   // Logistics
   { match: /relocat/i, value: () => PROFILE.willingToRelocate },
-  { match: /authorized|authorization|legally.*work|eligible.*work/i, value: () => PROFILE.workAuthorization },
-  { match: /sponsor/i, value: () => PROFILE.requireSponsorship },
+  { match: /authorized|authorization|legally.*work|eligible.*work/i, value: () => 'Yes' },
+  { match: /sponsor/i, value: () => 'No' },
+  { match: /plan to work remote|prefer.*remote|work.*remotely/i, value: () => 'Yes' },
+  { match: /ever been employed|previously.*employed|worked.*before/i, value: () => 'No' },
   { match: /salary|compensation|pay.*expect/i, value: () => PROFILE.salaryExpectation },
   { match: /notice.*period|start.*date|availab.*start|when.*start/i, value: () => PROFILE.noticePeriod },
   { match: /how.*hear|where.*find|referr(?!ed)|source.*(?:job|opening|position)|how.*learn.*about/i, value: () => 'Online job search' },
@@ -108,8 +111,9 @@ function analyzeForm(result) {
   
   for (const [ref, el] of Object.entries(elements)) {
     if (el.semantic === 'input' || el.semantic === 'textarea') {
-      // Find the label for this field by looking at surrounding text
-      const label = findLabel(el, lines, result);
+      // Use the label from the renderer (which checks <label for>, aria-label, etc.)
+      // Fall back to spatial label detection from the text grid
+      const label = el.label || findLabel(el, lines, result);
       const profileValue = matchFieldToProfile(label, el);
       
       if (profileValue) {
@@ -132,7 +136,7 @@ function analyzeForm(result) {
     }
     
     if (el.semantic === 'file') {
-      const label = findLabel(el, lines, result);
+      const label = el.label || findLabel(el, lines, result);
       const isResume = /resume|cv/i.test(label);
       const isCoverLetter = /cover.*letter/i.test(label);
       
@@ -146,7 +150,7 @@ function analyzeForm(result) {
     }
     
     if (el.semantic === 'select') {
-      const label = findLabel(el, lines, result);
+      const label = el.label || findLabel(el, lines, result);
       actions.push({
         action: 'select',
         ref: parseInt(ref),
@@ -156,7 +160,7 @@ function analyzeForm(result) {
     }
 
     if (el.semantic === 'checkbox' || el.semantic === 'radio') {
-      const label = findLabel(el, lines, result);
+      const label = el.label || findLabel(el, lines, result);
       // Auto-check common consent/agreement checkboxes
       if (/agree|consent|acknowledge|confirm|certif/i.test(label)) {
         actions.push({
