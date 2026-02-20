@@ -174,10 +174,14 @@ const { view, elements, meta } = await browser.navigate('https://example.com');
 
 console.log(view);        // The text grid
 console.log(elements);    // { 0: { selector, tag, text, href }, ... }
+console.log(meta.stats);  // { totalElements, interactiveElements, renderMs }
 
 await browser.click(3);              // Click element [3]
 await browser.type(7, 'hello');      // Type into element [7]
 await browser.scroll('down');        // Scroll down
+await browser.query('nav a');        // Find elements by CSS selector
+await browser.screenshot();          // PNG buffer (for debugging)
+console.log(browser.getCurrentUrl());// Current page URL
 await browser.close();
 ```
 
@@ -217,6 +221,37 @@ await browser.close();
 2. **Extract** every visible element's position, size, text, and interactivity
 3. **Map** pixel coordinates to character grid positions (spatial layout preserved)
 4. **Annotate** interactive elements with `[ref]` numbers for agent interaction
+
+## Selector Strategy
+
+TextWeb builds stable CSS selectors for each interactive element, preferring resilient strategies over brittle positional ones:
+
+| Priority | Strategy | Example |
+|----------|----------|---------|
+| 1 | `#id` | `#email` |
+| 2 | `[data-testid]` | `[data-testid="submit-btn"]` |
+| 3 | `[aria-label]` | `input[aria-label="Search"]` |
+| 4 | `[role]` (if unique) | `[role="navigation"]` |
+| 5 | `[name]` | `input[name="email"]` |
+| 6 | `a[href]` (if unique) | `a[href="/about"]` |
+| 7 | `nth-child` (fallback) | `div > a:nth-child(3)` |
+
+This means selectors survive DOM changes between snapshots — critical for multi-step agent workflows.
+
+## Testing
+
+```bash
+# Run all tests (81 total)
+npm test
+
+# Form fixture tests only (60 tests)
+npm run test:form
+
+# Live site tests — example.com, HN, Wikipedia (21 tests)
+npm run test:live
+```
+
+Test fixtures are in `test/fixtures/` — includes a comprehensive HTML form with all input types, tables, navigation, and dynamic content.
 
 ## Design Principles
 
