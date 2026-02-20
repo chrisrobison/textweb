@@ -158,6 +158,7 @@ function analyzeForm(result) {
         actions.push({
           action: 'type',
           ref: parseInt(ref),
+          selector: el.selector,
           value: profileValue,
           field: label,
           confidence: 'high',
@@ -166,6 +167,7 @@ function analyzeForm(result) {
         actions.push({
           action: 'type',
           ref: parseInt(ref),
+          selector: el.selector,
           value: null,
           field: label,
           confidence: 'unknown',
@@ -181,6 +183,7 @@ function analyzeForm(result) {
       actions.push({
         action: 'upload',
         ref: parseInt(ref),
+        selector: el.selector,
         filePath: isCoverLetter ? PROFILE.coverLetterPath : PROFILE.resumePath,
         field: label,
         fileType: isCoverLetter ? 'cover_letter' : 'resume',

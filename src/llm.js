@@ -13,8 +13,9 @@ const https = require('https');
 const DEFAULT_CONFIG = {
   baseUrl: 'http://localhost:1234/v1',
   model: 'google/gemma-3-4b',
-  maxTokens: 300,
+  maxTokens: 200,
   temperature: 0.7,
+  timeout: 60000,
 };
 
 // ─── Applicant Background (for prompt context) ─────────────────────────────
@@ -95,7 +96,7 @@ Write the answer (just the answer text, no preamble):`;
         'Content-Length': Buffer.byteLength(body),
         ...(cfg.apiKey ? { 'Authorization': `Bearer ${cfg.apiKey}` } : {}),
       },
-      timeout: 30000,
+      timeout: cfg.timeout || 60000,
     }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);

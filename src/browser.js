@@ -71,6 +71,36 @@ class AgentBrowser {
     return await this.snapshot();
   }
 
+  /**
+   * Fill a field by CSS selector without re-rendering (faster for batch fills)
+   */
+  async fillBySelector(selector, text) {
+    try {
+      await this.page.click(selector, { timeout: 5000 });
+      await this.page.fill(selector, text);
+    } catch (e) {
+      // Fallback: try typing character by character (for contenteditable, etc.)
+      try {
+        await this.page.click(selector, { timeout: 5000 });
+        await this.page.evaluate((sel) => {
+          const el = document.querySelector(sel);
+          if (el) { el.value = ''; el.textContent = ''; }
+        }, selector);
+        await this.page.type(selector, text, { delay: 10 });
+      } catch (e2) {
+        throw new Error(`Cannot fill ${selector}: ${e.message}`);
+      }
+    }
+  }
+
+  /**
+   * Upload a file by CSS selector
+   */
+  async uploadBySelector(selector, filePaths) {
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    await this.page.setInputFiles(selector, paths);
+  }
+
   async press(key) {
     await this.page.keyboard.press(key);
     await this.page.waitForLoadState('networkidle').catch(() => {});
