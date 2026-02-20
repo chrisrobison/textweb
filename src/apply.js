@@ -28,6 +28,8 @@ const PROFILE = {
   linkedin: 'https://linkedin.com/in/crobison',
   github: 'https://github.com/chrisrobison',
   website: 'https://cdr2.com',
+  twitter: 'https://twitter.com/thechrisrobison',
+  github: 'https://github.com/chrisrobison',
   currentTitle: 'CTO',
   currentCompany: 'D. Harris Tours',
   yearsExperience: '25',
@@ -64,19 +66,22 @@ const FIELD_PATTERNS = [
   
   // Links
   { match: /linkedin/i, value: () => PROFILE.linkedin },
+  { match: /twitter|x\.com|@.*handle/i, value: () => PROFILE.twitter },
+  { match: /github/i, value: () => PROFILE.github },
   { match: /github/i, value: () => PROFILE.github },
   { match: /website|portfolio|personal.*url|blog/i, value: () => PROFILE.website },
   
   // Work info
   { match: /current.*title|job.*title/i, value: () => PROFILE.currentTitle },
+  { match: /bound.*agreement|non.?compete|restrict.*ability/i, value: () => 'No' },
   { match: /current.*company|employer|organization/i, value: () => PROFILE.currentCompany },
   { match: /^(?!.*do you have).*(?:years.*experience|experience.*years|how many years)/i, value: () => PROFILE.yearsExperience },
   { match: /^do you have.*(?:years|experience)/i, value: () => 'Yes' },
   
   // Logistics
   { match: /relocat/i, value: () => PROFILE.willingToRelocate },
-  { match: /authorized|authorization|legally.*work|eligible.*work/i, value: () => 'Yes' },
   { match: /sponsor/i, value: () => 'No' },
+  { match: /authorized|authorization|legally.*work|eligible.*work/i, value: () => 'Yes' },
   { match: /plan to work remote|prefer.*remote|work.*remotely/i, value: () => 'Yes' },
   { match: /ever been employed|previously.*employed|worked.*before/i, value: () => 'No' },
   { match: /salary|compensation|pay.*expect/i, value: () => PROFILE.salaryExpectation },
