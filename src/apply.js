@@ -73,7 +73,7 @@ const FIELD_PATTERNS = [
   
   // Work info
   { match: /current.*title|job.*title/i, value: () => PROFILE.currentTitle },
-  { match: /bound.*agreement|non.?compete|restrict.*ability/i, value: () => 'No' },
+  { match: /bound.*agreement|non.?compete|restrict|post.?employment|employment.*agreement/i, value: () => 'No' },
   { match: /current.*company|employer|organization/i, value: () => PROFILE.currentCompany },
   { match: /^(?!.*do you have).*(?:years.*experience|experience.*years|how many years)/i, value: () => PROFILE.yearsExperience },
   { match: /^do you have.*(?:years|experience)/i, value: () => 'Yes' },
@@ -95,6 +95,16 @@ const FIELD_PATTERNS = [
   { match: /school|university|college|institution/i, value: () => PROFILE.school },
   { match: /degree|education.*level/i, value: () => PROFILE.degree },
   
+  // Social profiles
+  { match: /twitter|x\.com|@.*handle/i, value: () => PROFILE.twitter },
+  { match: /^github$|github.*profile|github.*url/i, value: () => PROFILE.github },
+
+  // Common freeform with safe defaults
+  { match: /accessible|accommodat|adjustment.*interview|disability.*interview/i, value: () => 'No adjustments needed, thank you.' },
+  { match: /preferred.*name|name.*prefer|call you/i, value: () => PROFILE.preferredName || PROFILE.firstName },
+  { match: /country.*resid|current.*country/i, value: () => PROFILE.country },
+  { match: /lgbtq|sexual.*orient/i, value: () => 'Prefer not to say' },
+
   // Yes/No common questions  
   { match: /opt.?in|subscribe|marketing.*(?:email|message)|whatsapp/i, value: () => 'No' },
 ];
