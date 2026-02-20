@@ -80,14 +80,48 @@ async function extractElements(page) {
 
     function buildSelector(el) {
       // Build a robust CSS selector for clicking
+      // Priority: id > data-testid > aria > role+name > name > positional
       if (el.id) return '#' + CSS.escape(el.id);
       
-      // Try unique attributes
-      if (el.getAttribute('data-testid')) return `[data-testid="${el.getAttribute('data-testid')}"]`;
-      if (el.getAttribute('name')) return `${el.tagName.toLowerCase()}[name="${el.getAttribute('name')}"]`;
-      
-      // Fallback: positional selector
       const tag = el.tagName.toLowerCase();
+      
+      // Stable test attributes (used by many frameworks)
+      for (const attr of ['data-testid', 'data-test', 'data-cy', 'data-test-id']) {
+        const val = el.getAttribute(attr);
+        if (val) return `[${attr}="${val}"]`;
+      }
+      
+      // Aria-label (very stable, set by developers intentionally)
+      const ariaLabel = el.getAttribute('aria-label');
+      if (ariaLabel) {
+        const sel = `${tag}[aria-label="${CSS.escape(ariaLabel)}"]`;
+        if (document.querySelectorAll(sel).length === 1) return sel;
+      }
+
+      // Role + name combination
+      const role = el.getAttribute('role');
+      if (role) {
+        const name = ariaLabel || el.textContent.trim().substring(0, 50);
+        if (name) {
+          const sel = `[role="${role}"]`;
+          // Only use if unique enough
+          if (document.querySelectorAll(sel).length === 1) return sel;
+        }
+      }
+
+      // Name attribute (forms)
+      if (el.getAttribute('name')) return `${tag}[name="${el.getAttribute('name')}"]`;
+      
+      // href for links (use partial match for stability)
+      if (tag === 'a' && el.href) {
+        const href = el.getAttribute('href');
+        if (href && !href.startsWith('javascript:') && href !== '#') {
+          const sel = `a[href="${CSS.escape(href)}"]`;
+          if (document.querySelectorAll(sel).length === 1) return sel;
+        }
+      }
+
+      // Fallback: positional selector (least stable)
       const parent = el.parentElement;
       if (!parent) return tag;
       const siblings = Array.from(parent.children);
@@ -426,6 +460,7 @@ function renderGrid(elements, cols, charW, charH, scrollY = 0) {
  */
 async function render(page, options = {}) {
   const { cols = 120, scrollY = 0 } = options;
+  const startMs = Date.now();
   
   // Measure actual font metrics from the page
   const metrics = await measureCharSize(page);
@@ -433,7 +468,16 @@ async function render(page, options = {}) {
   const charH = metrics.charH;
   
   const elements = await extractElements(page);
-  return renderGrid(elements, cols, charW, charH, scrollY);
+  const result = renderGrid(elements, cols, charW, charH, scrollY);
+  
+  // Add stats to meta
+  result.meta.stats = {
+    totalElements: elements.length,
+    interactiveElements: result.meta.totalRefs,
+    renderMs: Date.now() - startMs,
+  };
+  
+  return result;
 }
 
 module.exports = { render, extractElements, renderGrid, measureCharSize };

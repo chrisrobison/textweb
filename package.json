@@ -10,7 +10,9 @@
   "scripts": {
     "start": "node src/cli.js",
     "serve": "node src/server.js",
-    "test": "node test/basic.js"
+    "test": "node test/test-form.js && node test/test-live.js",
+    "test:form": "node test/test-form.js",
+    "test:live": "node test/test-live.js"
   },
   "keywords": [
     "ai",

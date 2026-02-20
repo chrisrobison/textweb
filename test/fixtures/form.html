@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TextWeb Test Form</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h1 { margin-bottom: 5px; }
+    h2 { color: #555; margin-top: 30px; }
+    .subtitle { color: #666; margin-bottom: 30px; }
+    label { display: block; margin-top: 15px; font-weight: bold; }
+    input[type="text"], input[type="email"], input[type="tel"], input[type="url"],
+    input[type="number"], input[type="password"], textarea, select {
+      width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+    }
+    textarea { height: 80px; resize: vertical; }
+    .radio-group, .checkbox-group { margin-top: 5px; }
+    .radio-group label, .checkbox-group label { display: inline; font-weight: normal; margin-right: 15px; }
+    button, input[type="submit"] {
+      background: #2563eb; color: white; border: none; padding: 10px 24px;
+      border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 20px;
+    }
+    button:hover { background: #1d4ed8; }
+    .secondary-btn { background: #6b7280; }
+    a { color: #2563eb; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f3f4f6; }
+    nav { background: #1f2937; padding: 10px 20px; margin: -40px -20px 30px; }
+    nav a { color: white; text-decoration: none; margin-right: 20px; }
+    .hidden-field { display: none; }
+    #dynamic-section { display: none; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    [data-testid] { /* marker for test selectors */ }
+    .alert { background: #fef3c7; border: 1px solid #f59e0b; padding: 10px; border-radius: 4px; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Main navigation">
+    <a href="#" data-testid="nav-home">Home</a>
+    <a href="#about" data-testid="nav-about">About</a>
+    <a href="#contact" data-testid="nav-contact">Contact</a>
+    <a href="https://github.com" data-testid="nav-external">GitHub</a>
+  </nav>
+
+  <h1>Job Application Form</h1>
+  <p class="subtitle">TextWeb Test Fixture — stable content for automated testing</p>
+
+  <div class="alert" role="alert" data-testid="alert-banner">
+    This is a test form. No data is submitted anywhere.
+  </div>
+
+  <form id="application-form" data-testid="main-form" onsubmit="return false;">
+    <h2>Personal Information</h2>
+
+    <div class="two-col">
+      <div>
+        <label for="first-name">First Name *</label>
+        <input type="text" id="first-name" name="firstName" required placeholder="John" data-testid="input-firstname" aria-required="true">
+      </div>
+      <div>
+        <label for="last-name">Last Name *</label>
+        <input type="text" id="last-name" name="lastName" required placeholder="Doe" data-testid="input-lastname" aria-required="true">
+      </div>
+    </div>
+
+    <label for="email">Email Address *</label>
+    <input type="email" id="email" name="email" required placeholder="john@example.com" data-testid="input-email" aria-required="true">
+
+    <label for="phone">Phone Number</label>
+    <input type="tel" id="phone" name="phone" placeholder="(555) 123-4567" data-testid="input-phone">
+
+    <label for="linkedin">LinkedIn URL</label>
+    <input type="url" id="linkedin" name="linkedin" placeholder="https://linkedin.com/in/yourprofile" data-testid="input-linkedin">
+
+    <label for="portfolio">Portfolio / Website</label>
+    <input type="url" id="portfolio" name="portfolio" placeholder="https://yoursite.com" data-testid="input-portfolio">
+
+    <h2>Professional Details</h2>
+
+    <label for="role">Desired Role *</label>
+    <select id="role" name="role" required data-testid="select-role" aria-required="true">
+      <option value="">-- Select a role --</option>
+      <option value="cto">CTO</option>
+      <option value="vp-eng">VP of Engineering</option>
+      <option value="dir-eng">Director of Engineering</option>
+      <option value="staff-eng">Staff Engineer</option>
+      <option value="senior-eng">Senior Engineer</option>
+      <option value="eng-manager">Engineering Manager</option>
+    </select>
+
+    <label for="experience">Years of Experience *</label>
+    <input type="number" id="experience" name="experience" min="0" max="50" placeholder="10" data-testid="input-experience" aria-required="true">
+
+    <label for="salary">Expected Salary (USD)</label>
+    <input type="text" id="salary" name="salary" placeholder="$150,000 - $300,000" data-testid="input-salary">
+
+    <label>Work Authorization</label>
+    <div class="radio-group" role="radiogroup" aria-label="Work Authorization">
+      <label><input type="radio" name="workAuth" value="citizen" data-testid="radio-citizen"> US Citizen</label>
+      <label><input type="radio" name="workAuth" value="green-card" data-testid="radio-greencard"> Green Card</label>
+      <label><input type="radio" name="workAuth" value="visa" data-testid="radio-visa"> Visa Required</label>
+    </div>
+
+    <label>Willing to Relocate?</label>
+    <div class="radio-group" role="radiogroup" aria-label="Relocation">
+      <label><input type="radio" name="relocate" value="yes" data-testid="radio-relocate-yes"> Yes</label>
+      <label><input type="radio" name="relocate" value="no" data-testid="radio-relocate-no"> No</label>
+      <label><input type="radio" name="relocate" value="remote" data-testid="radio-remote"> Remote Only</label>
+    </div>
+
+    <label>Preferred Work Style</label>
+    <div class="checkbox-group" data-testid="checkbox-workstyle">
+      <label><input type="checkbox" name="workStyle" value="remote"> Remote</label>
+      <label><input type="checkbox" name="workStyle" value="hybrid"> Hybrid</label>
+      <label><input type="checkbox" name="workStyle" value="onsite"> On-site</label>
+    </div>
+
+    <h2>Skills & Experience</h2>
+
+    <label for="skills">Key Skills (comma separated)</label>
+    <input type="text" id="skills" name="skills" placeholder="JavaScript, Python, Leadership, Architecture" data-testid="input-skills">
+
+    <label for="cover-letter">Cover Letter / Why This Role?</label>
+    <textarea id="cover-letter" name="coverLetter" placeholder="Tell us why you're interested in this role..." data-testid="textarea-cover"></textarea>
+
+    <label for="achievement">Greatest Professional Achievement</label>
+    <textarea id="achievement" name="achievement" placeholder="Describe your most impactful accomplishment..." data-testid="textarea-achievement"></textarea>
+
+    <h2>Additional Information</h2>
+
+    <label for="resume">Upload Resume</label>
+    <input type="file" id="resume" name="resume" accept=".pdf,.doc,.docx" data-testid="input-resume">
+
+    <label for="start-date">Earliest Start Date</label>
+    <input type="text" id="start-date" name="startDate" placeholder="2 weeks notice" data-testid="input-startdate">
+
+    <label for="referral">How did you hear about us?</label>
+    <select id="referral" name="referral" data-testid="select-referral">
+      <option value="">-- Select --</option>
+      <option value="linkedin">LinkedIn</option>
+      <option value="indeed">Indeed</option>
+      <option value="referral">Employee Referral</option>
+      <option value="website">Company Website</option>
+      <option value="other">Other</option>
+    </select>
+
+    <!-- Hidden field (should be detected but not displayed prominently) -->
+    <input type="hidden" name="source" value="textweb-test" data-testid="hidden-source">
+
+    <div style="margin-top: 30px;">
+      <button type="submit" data-testid="btn-submit">Submit Application</button>
+      <button type="button" class="secondary-btn" data-testid="btn-save" onclick="alert('Saved!')">Save Draft</button>
+      <button type="reset" class="secondary-btn" data-testid="btn-reset">Clear Form</button>
+    </div>
+  </form>
+
+  <h2>Reference Information</h2>
+  <table data-testid="reference-table">
+    <thead>
+      <tr><th>Company</th><th>Role</th><th>Salary Range</th><th>Location</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Acme Corp</td><td>VP Engineering</td><td>$280k-$350k</td><td>Remote</td></tr>
+      <tr><td>TechStart Inc</td><td>CTO</td><td>$200k-$300k + equity</td><td>SF, CA</td></tr>
+      <tr><td>BigCo</td><td>Director of Eng</td><td>$250k-$320k</td><td>NYC / Remote</td></tr>
+    </tbody>
+  </table>
+
+  <section id="dynamic-section" data-testid="dynamic-section" style="display: none;">
+    <h2>Dynamic Content</h2>
+    <p id="dynamic-text">This section appears after clicking the button below.</p>
+  </section>
+
+  <button data-testid="btn-toggle" onclick="document.getElementById('dynamic-section').style.display = document.getElementById('dynamic-section').style.display === 'none' ? 'block' : 'none'">
+    Toggle Dynamic Section
+  </button>
+
+  <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #888;">
+    <p>TextWeb Test Form v1.0 — <a href="https://github.com/chrisrobison/textweb" data-testid="link-github">View on GitHub</a></p>
+  </footer>
+</body>
+</html>
