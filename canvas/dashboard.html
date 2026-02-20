@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TextWeb Job Pipeline</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0a1628 100%);
+    color: #e8e8f0; min-height: 100vh; padding: 16px; overflow-y: auto;
+  }
+  .hdr { text-align: center; margin-bottom: 14px; }
+  .hdr h1 {
+    font-size: 20px; font-weight: 700;
+    background: linear-gradient(90deg, #7b68ee, #00d4ff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .sub { font-size: 11px; color: #888; margin-top: 2px; }
+  .stats { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .st {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; padding: 8px 12px; text-align: center; flex: 1; max-width: 90px; min-width: 70px;
+  }
+  .st .n { font-size: 24px; font-weight: 800; line-height: 1; }
+  .st .l { font-size: 8px; color: #999; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .st.ok .n { color: #4ade80; }
+  .st.mb .n { color: #fbbf24; }
+  .st.fa .n { color: #f87171; }
+  .st.tt .n { color: #7b68ee; }
+  .st.ac .n { color: #38bdf8; }
+  .btns { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .btn {
+    background: rgba(123,104,238,0.2); border: 1px solid rgba(123,104,238,0.4);
+    border-radius: 8px; padding: 7px 14px; color: #c8c8ff; font-size: 11px;
+    cursor: pointer; font-weight: 600; transition: all 0.15s; white-space: nowrap;
+  }
+  .btn:hover { background: rgba(123,104,238,0.35); transform: scale(1.02); }
+  .btn:active { transform: scale(0.98); }
+  .btn.green { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.3); color: #86efac; }
+  .btn.amber { background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.3); color: #fde68a; }
+  .jl {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; overflow: hidden; margin-bottom: 10px;
+  }
+  .sl {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #666;
+    padding: 6px 12px 3px; background: rgba(255,255,255,0.02);
+  }
+  .sl.act { color: #38bdf8; background: rgba(56,189,248,0.05); }
+  .sl.q { color: #a78bfa; }
+  .j {
+    display: flex; align-items: center; padding: 7px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05); gap: 8px; font-size: 12px;
+    transition: background 0.15s;
+  }
+  .j:last-child { border-bottom: none; }
+  .j:hover { background: rgba(255,255,255,0.03); }
+  .j.active { background: rgba(56,189,248,0.08); animation: activePulse 2s infinite; }
+  .j .i { font-size: 14px; flex-shrink: 0; }
+  .j .c { font-weight: 600; color: #c8c8ff; min-width: 75px; font-size: 11px; }
+  .j .t { color: #aaa; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+  .j .f { font-size: 10px; color: #666; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .j .tm { font-size: 9px; color: #555; flex-shrink: 0; }
+  @keyframes activePulse { 0%,100%{background:rgba(56,189,248,0.08)} 50%{background:rgba(56,189,248,0.15)} }
+  .live { text-align: center; margin-top: 10px; font-size: 10px; color: #666; min-height: 20px; }
+  .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #4ade80; margin-right: 4px; animation: jpulse 2s infinite;
+  }
+  .dot.active { background: #38bdf8; animation: jpulse 0.8s infinite; }
+  @keyframes jpulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .ft { text-align: center; margin-top: 6px; font-size: 9px; color: #444; }
+  .empty { text-align: center; padding: 30px 20px; color: #666; }
+  .empty .big { font-size: 40px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+  <div class="hdr">
+    <h1>🦊 TextWeb Job Pipeline</h1>
+    <div class="sub">Zero screenshots · Zero API cost · Local LLM</div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="btns">
+    <div class="btn green" onclick="agentMsg('Find and apply to 5 more engineering leadership jobs via the TextWeb pipeline')">🔍 Find + Apply</div>
+    <div class="btn" onclick="agentMsg('Discover new jobs on Greenhouse boards and show them on the canvas dashboard')">📋 Discover</div>
+    <div class="btn amber" onclick="agentMsg('Check my email for any job application confirmations or responses')">📬 Inbox</div>
+  </div>
+  <div class="jl" id="jobList"></div>
+  <div class="live" id="liveStatus"></div>
+  <div class="ft">TextWeb v0.1.1 · Gemma 3 4B · Playwright headless</div>
+<script>
+function agentMsg(msg) {
+  window.location.href = 'openclaw://agent?message=' + encodeURIComponent(msg);
+}
+function esc(s) { return (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function relTime(iso) {
+  if (!iso) return '';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return mins + 'm';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h';
+  return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function render(data) {
+  const jobs = data.jobs || [];
+  const icons = {submitted:'✅',probable:'🟡',active:'⏳',failed:'❌',queued:'📋',filling:'✏️',uploading:'📎',llm:'🤖',submitting:'🔘'};
+  const activeStatuses = ['active','filling','uploading','llm','submitting'];
+  const confirmed = jobs.filter(j=>j.status==='submitted').length;
+  const probable = jobs.filter(j=>j.status==='probable').length;
+  const active = jobs.filter(j=>activeStatuses.includes(j.status)).length;
+  const failed = jobs.filter(j=>j.status==='failed').length;
+  const queued = jobs.filter(j=>j.status==='queued').length;
+  let sh = `<div class="st ok"><div class="n">${confirmed}</div><div class="l">Confirmed</div></div>
+    <div class="st mb"><div class="n">${probable}</div><div class="l">Probable</div></div>`;
+  if(active) sh += `<div class="st ac"><div class="n">${active}</div><div class="l">Active</div></div>`;
+  if(queued) sh += `<div class="st" style="border-color:rgba(167,139,250,0.3)"><div class="n" style="color:#a78bfa">${queued}</div><div class="l">Queued</div></div>`;
+  if(failed) sh += `<div class="st fa"><div class="n">${failed}</div><div class="l">Failed</div></div>`;
+  sh += `<div class="st tt"><div class="n">${jobs.length}</div><div class="l">Total</div></div>`;
+  document.getElementById('stats').innerHTML = sh;
+  const groups = [
+    {label:'🔴 ACTIVE',cls:'act',statuses:activeStatuses},
+    {label:'QUEUED',cls:'q',statuses:['queued']},
+    {label:'CONFIRMED',cls:'',statuses:['submitted']},
+    {label:'PROBABLE',cls:'',statuses:['probable']},
+    {label:'FAILED',cls:'',statuses:['failed']},
+  ];
+  let lh = '';
+  for (const g of groups) {
+    const items = jobs.filter(j=>g.statuses.includes(j.status));
+    if (!items.length) continue;
+    lh += `<div class="sl ${g.cls}">${g.label}</div>`;
+    for (const j of items) {
+      const f = j.autoFields!=null ? `${j.autoFields}+${j.llmFields||0}` : '';
+      const t = relTime(j.submittedAt||j.startedAt||j.queuedAt);
+      lh += `<div class="j${activeStatuses.includes(j.status)?' active':''}"><span class="i">${icons[j.status]||'📋'}</span><span class="c">${esc(j.company)}</span><span class="t">${esc(j.title)}</span><span class="f">${f}</span><span class="tm">${t}</span></div>`;
+    }
+  }
+  if(!jobs.length) lh = '<div class="empty"><div class="big">🦊</div>No jobs yet. Click Find + Apply!</div>';
+  document.getElementById('jobList').innerHTML = lh;
+  const live = document.getElementById('liveStatus');
+  if(data.liveStatus) live.innerHTML = `<span class="dot active"></span>${esc(data.liveStatus)}`;
+  else if(active) live.innerHTML = '<span class="dot active"></span>Applying...';
+  else live.innerHTML = `<span class="dot"></span>Idle · ${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}`;
+}
+// Use embedded state (injected by dashboard.js) or empty
+const state = window.__PIPELINE_STATE__ || {jobs:[]};
+render(state);
+</script>
+</body>
+</html>
