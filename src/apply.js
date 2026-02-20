@@ -35,6 +35,10 @@ const PROFILE = {
   requireSponsorship: 'No',
   salaryExpectation: '200000',
   noticePeriod: 'Immediately',
+  country: 'United States',
+  countryCode: 'US',
+  school: 'City College of San Francisco',
+  degree: "Bachelor's",
   
   // Default resume/cover letter
   resumePath: path.join(process.env.HOME, '.jobsearch/christopher-robison-resume.pdf'),
@@ -77,6 +81,27 @@ const FIELD_PATTERNS = [
   { match: /salary|compensation|pay.*expect/i, value: () => PROFILE.salaryExpectation },
   { match: /notice.*period|start.*date|availab.*start|when.*start/i, value: () => PROFILE.noticePeriod },
   { match: /how.*hear|where.*find|referr(?!ed)|source.*(?:job|opening|position)|how.*learn.*about/i, value: () => 'Online job search' },
+  
+  // Country
+  { match: /^country$|select.*country.*reside|country.*currently/i, value: () => PROFILE.country },
+  
+  // Education
+  { match: /school|university|college|institution/i, value: () => PROFILE.school },
+  { match: /degree|education.*level/i, value: () => PROFILE.degree },
+  
+  // Yes/No common questions  
+  { match: /opt.?in|subscribe|marketing.*(?:email|message)|whatsapp/i, value: () => 'No' },
+];
+
+// ─── EEO / Demographic Fields (skip these) ──────────────────────────────────
+const EEO_PATTERNS = [
+  /gender/i,
+  /race|ethnicity/i,
+  /hispanic|latino/i,
+  /veteran/i,
+  /disability|disabled/i,
+  /sexual.*orientation/i,
+  /pronoun/i,
 ];
 
 // ─── Platform Detection ─────────────────────────────────────────────────────
@@ -114,6 +139,18 @@ function analyzeForm(result) {
       // Use the label from the renderer (which checks <label for>, aria-label, etc.)
       // Fall back to spatial label detection from the text grid
       const label = el.label || findLabel(el, lines, result);
+      
+      // Skip EEO/demographic fields
+      if (isEEOField(label)) {
+        actions.push({
+          action: 'skip',
+          ref: parseInt(ref),
+          field: label,
+          reason: 'eeo_demographic',
+        });
+        continue;
+      }
+      
       const profileValue = matchFieldToProfile(label, el);
       
       if (profileValue) {
@@ -224,6 +261,14 @@ function findLabel(el, lines, result) {
 }
 
 /**
+ * Check if a field is an EEO/demographic field that should be skipped
+ */
+function isEEOField(label) {
+  if (!label) return false;
+  return EEO_PATTERNS.some(pattern => pattern.test(label));
+}
+
+/**
  * Match a field label to profile data
  */
 function matchFieldToProfile(label, el) {
@@ -262,9 +307,18 @@ class JobApplicator {
     
     // Navigate to the application page
     let result = await this.browser.navigate(url);
-    const platform = detectPlatform(url, result.view);
+    let platform = detectPlatform(url, result.view);
     this._log('info', `Detected platform: ${platform}`);
     this._log('info', `Page: ${result.meta.title}`);
+    
+    // Check for embedded ATS iframe (Greenhouse, Lever, etc.)
+    const iframeUrl = await this._detectATSIframe();
+    if (iframeUrl) {
+      this._log('info', `Found embedded ATS form: ${iframeUrl}`);
+      result = await this.browser.navigate(iframeUrl);
+      platform = detectPlatform(iframeUrl, result.view);
+      this._log('info', `Switched to: ${platform}`);
+    }
     
     if (this.verbose) {
       console.log('\n' + result.view + '\n');
@@ -298,7 +352,30 @@ class JobApplicator {
         this._log('fill', `[${action.ref}] ${action.field} → "${action.value}"`);
         if (!this.dryRun) {
           try {
-            result = await this.browser.type(action.ref, action.value);
+            // Check if this is a combobox (React Select, etc.)
+            const isCombobox = await this.browser.page.evaluate((selector) => {
+              const el = document.querySelector(selector);
+              return el && (el.getAttribute('role') === 'combobox' || 
+                el.classList.contains('select__input') ||
+                el.getAttribute('aria-autocomplete') === 'list');
+            }, result.elements[action.ref]?.selector);
+            
+            if (isCombobox) {
+              // For comboboxes: click, clear, type value, wait for dropdown, press Enter
+              this._log('fill', `  (combobox mode for [${action.ref}])`);
+              const sel = result.elements[action.ref].selector;
+              await this.browser.page.click(sel);
+              await this.browser.page.fill(sel, '');
+              await this.browser.page.type(sel, action.value, { delay: 50 });
+              await this.browser.page.waitForTimeout(500); // wait for dropdown
+              await this.browser.page.keyboard.press('ArrowDown');
+              await this.browser.page.waitForTimeout(100);
+              await this.browser.page.keyboard.press('Enter');
+              await this.browser.page.waitForTimeout(200);
+              result = await this.browser.snapshot();
+            } else {
+              result = await this.browser.type(action.ref, action.value);
+            }
           } catch (err) {
             this._log('error', `Failed to fill [${action.ref}] ${action.field}: ${err.message}`);
           }
@@ -340,6 +417,11 @@ class JobApplicator {
       // Log unknown fields
       for (const action of unknown) {
         this._log('skip', `[${action.ref}] "${action.field}" — no auto-fill match`);
+      }
+
+      // Log skipped EEO fields
+      for (const action of actions.filter(a => a.action === 'skip' && a.reason === 'eeo_demographic')) {
+        this._log('skip', `[${action.ref}] "${action.field}" — EEO demographic (intentionally blank)`);
       }
 
       // Take a fresh snapshot after fills
@@ -415,6 +497,32 @@ class JobApplicator {
 
   async close() {
     if (this.browser) await this.browser.close();
+  }
+
+  /**
+   * Detect if the current page embeds an ATS application form in an iframe
+   */
+  async _detectATSIframe() {
+    if (!this.browser || !this.browser.page) return null;
+    
+    const iframeUrl = await this.browser.page.evaluate(() => {
+      const iframes = document.querySelectorAll('iframe');
+      for (const iframe of iframes) {
+        const src = iframe.src || '';
+        // Greenhouse embedded forms
+        if (src.includes('greenhouse.io/embed/job_app')) return src;
+        if (src.includes('job-boards.greenhouse.io')) return src;
+        // Lever embedded forms
+        if (src.includes('jobs.lever.co') && src.includes('apply')) return src;
+        // Ashby embedded forms
+        if (src.includes('jobs.ashbyhq.com') && src.includes('application')) return src;
+        // Workday
+        if (src.includes('myworkday') || src.includes('workday.com')) return src;
+      }
+      return null;
+    });
+    
+    return iframeUrl;
   }
 
   _log(level, message) {
