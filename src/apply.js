@@ -12,6 +12,7 @@
  */
 
 const { AgentBrowser } = require('./browser');
+const { generateAnswers, checkLLM } = require('./llm');
 const path = require('path');
 const fs = require('fs');
 
@@ -293,6 +294,10 @@ class JobApplicator {
     this.resumePath = options.resumePath || PROFILE.resumePath;
     this.coverLetterPath = options.coverLetterPath || PROFILE.coverLetterPath;
     this.maxSteps = options.maxSteps || 10; // safety limit for multi-step forms
+    this.useLLM = options.useLLM !== false; // default: try LLM for unknowns
+    this.llmConfig = options.llmConfig || {};
+    this.jobDescription = options.jobDescription || '';
+    this.company = options.company || '';
     this.log = [];
   }
 
@@ -312,12 +317,16 @@ class JobApplicator {
     this._log('info', `Page: ${result.meta.title}`);
     
     // Check for embedded ATS iframe (Greenhouse, Lever, etc.)
-    const iframeUrl = await this._detectATSIframe();
-    if (iframeUrl) {
-      this._log('info', `Found embedded ATS form: ${iframeUrl}`);
-      result = await this.browser.navigate(iframeUrl);
-      platform = detectPlatform(iframeUrl, result.view);
-      this._log('info', `Switched to: ${platform}`);
+    // Skip if we're already on an ATS domain
+    const alreadyOnATS = /greenhouse\.io|lever\.co|ashbyhq\.com|myworkday|workday\.com/i.test(url);
+    if (!alreadyOnATS) {
+      const iframeUrl = await this._detectATSIframe();
+      if (iframeUrl) {
+        this._log('info', `Found embedded ATS form: ${iframeUrl}`);
+        result = await this.browser.navigate(iframeUrl);
+        platform = detectPlatform(iframeUrl, result.view);
+        this._log('info', `Switched to: ${platform}`);
+      }
     }
     
     if (this.verbose) {
@@ -414,9 +423,42 @@ class JobApplicator {
         }
       }
 
-      // Log unknown fields
-      for (const action of unknown) {
-        this._log('skip', `[${action.ref}] "${action.field}" — no auto-fill match`);
+      // Use LLM to answer unknown freeform fields
+      if (unknown.length > 0 && this.useLLM && !this.dryRun) {
+        const llmAvailable = await checkLLM(this.llmConfig);
+        if (llmAvailable) {
+          this._log('info', `Generating LLM answers for ${unknown.length} unknown fields...`);
+          
+          // Extract job description from page if we don't have it
+          if (!this.jobDescription) {
+            this.jobDescription = result.view.substring(0, 3000);
+          }
+          
+          const answers = await generateAnswers(unknown, this.jobDescription, this.company, this.llmConfig);
+          
+          for (const action of unknown) {
+            const answer = answers[action.ref];
+            if (answer) {
+              this._log('fill', `[${action.ref}] ${action.field} → "${answer.substring(0, 80)}${answer.length > 80 ? '...' : ''}" (LLM)`);
+              try {
+                result = await this.browser.type(action.ref, answer);
+              } catch (err) {
+                this._log('error', `Failed to fill [${action.ref}] ${action.field}: ${err.message}`);
+              }
+            } else {
+              this._log('skip', `[${action.ref}] "${action.field}" — LLM couldn't answer`);
+            }
+          }
+        } else {
+          this._log('warn', 'LLM not available — skipping freeform fields');
+          for (const action of unknown) {
+            this._log('skip', `[${action.ref}] "${action.field}" — no auto-fill match, no LLM`);
+          }
+        }
+      } else {
+        for (const action of unknown) {
+          this._log('skip', `[${action.ref}] "${action.field}" — no auto-fill match`);
+        }
       }
 
       // Log skipped EEO fields
@@ -565,6 +607,8 @@ async function batchApply(jobsFile, options) {
       ...options,
       coverLetterPath: job.coverLetterPath || options.coverLetterPath,
       resumePath: job.resumePath || options.resumePath,
+      company: job.company || options.company,
+      jobDescription: job.description || options.jobDescription,
     });
     
     try {
@@ -606,6 +650,10 @@ async function main() {
     coverLetterPath: null,
     batchFile: null,
     url: null,
+    useLLM: true,
+    company: '',
+    jobDescription: '',
+    noLLM: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -615,6 +663,8 @@ async function main() {
     else if (arg === '--resume') options.resumePath = args[++i];
     else if (arg === '--cover-letter') options.coverLetterPath = args[++i];
     else if (arg === '--batch') options.batchFile = args[++i];
+    else if (arg === '--company') options.company = args[++i];
+    else if (arg === '--no-llm') { options.useLLM = false; options.noLLM = true; }
     else if (arg === '-h' || arg === '--help') { printHelp(); process.exit(0); }
     else if (!arg.startsWith('-')) options.url = arg;
   }
