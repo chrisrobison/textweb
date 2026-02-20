@@ -60,7 +60,7 @@ class AgentBrowser {
   async click(ref) {
     const el = this._getElement(ref);
     await this.page.click(el.selector);
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this._settle();
     return await this.snapshot();
   }
 
@@ -103,7 +103,7 @@ class AgentBrowser {
 
   async press(key) {
     await this.page.keyboard.press(key);
-    await this.page.waitForLoadState('networkidle').catch(() => {});
+    await this._settle();
     return await this.snapshot();
   }
 
@@ -157,6 +157,56 @@ class AgentBrowser {
       this.context = null;
       this.page = null;
     }
+  }
+
+  /**
+   * Get the current page URL
+   */
+  getCurrentUrl() {
+    return this.page ? this.page.url() : null;
+  }
+
+  /**
+   * Find elements matching a CSS selector
+   * Returns array of {tag, text, selector, visible} objects
+   */
+  async query(selector) {
+    if (!this.page) throw new Error('No page open. Call navigate() first.');
+    return await this.page.evaluate((sel) => {
+      const els = document.querySelectorAll(sel);
+      return Array.from(els).map((el, i) => ({
+        tag: el.tagName.toLowerCase(),
+        text: (el.textContent || '').trim().substring(0, 200),
+        selector: `${sel}:nth-child(${i + 1})`,
+        visible: el.offsetParent !== null,
+        href: el.href || null,
+        value: el.value || null,
+      }));
+    }, selector);
+  }
+
+  /**
+   * Take a screenshot (for debugging)
+   * @param {object} options - Playwright screenshot options (path, fullPage, type, etc.)
+   */
+  async screenshot(options = {}) {
+    if (!this.page) throw new Error('No page open. Call navigate() first.');
+    return await this.page.screenshot({
+      fullPage: true,
+      type: 'png',
+      ...options,
+    });
+  }
+
+  /**
+   * Wait for page to settle after an interaction.
+   * Races networkidle against a short timeout to avoid hanging on SPAs.
+   */
+  async _settle() {
+    await Promise.race([
+      this.page.waitForLoadState('networkidle').catch(() => {}),
+      new Promise(r => setTimeout(r, 3000)),
+    ]);
   }
 
   _getElement(ref) {

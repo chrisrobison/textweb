@@ -10,7 +10,7 @@ class TextWebServer {
   constructor(options = {}) {
     this.options = {
       cols: options.cols || 100,
-      rows: options.rows || 30,
+      // rows is deprecated — height is dynamic
       timeout: options.timeout || 30000,
       ...options
     };
@@ -33,7 +33,6 @@ class TextWebServer {
     if (!this.browser) {
       this.browser = new AgentBrowser({
         cols: this.options.cols,
-        rows: this.options.rows,
         headless: true,
         timeout: this.options.timeout
       });

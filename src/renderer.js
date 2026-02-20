@@ -7,8 +7,8 @@
  * Key design decisions:
  * - Overflow > truncation (never lose information)
  * - Measure actual font metrics from the page
- * - Table-aware layout
- * - Z-index compositing (back to front)
+ * - Row-grouping layout (elements grouped by Y position)
+ * - Dynamic height (grows to fit all content)
  */
 
 /**
@@ -275,44 +275,6 @@ async function extractElements(page) {
     results.sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
     return results;
   });
-}
-
-/**
- * Place text onto the grid, allowing overflow (never truncate).
- * Text wraps to the next line at grid edge, continuing at the same start column.
- */
-function placeText(grid, zGrid, z, row, col, text, cols, rows) {
-  let r = row;
-  let c = col;
-
-  for (let i = 0; i < text.length; i++) {
-    // Grow grid vertically if needed (overflow — don't lose data)
-    while (r >= grid.length) {
-      grid.push(Array(cols).fill(' '));
-      zGrid.push(Array(cols).fill(-1));
-    }
-
-    if (c >= cols) {
-      // Wrap to next line at original column position
-      r++;
-      c = col;
-      while (r >= grid.length) {
-        grid.push(Array(cols).fill(' '));
-        zGrid.push(Array(cols).fill(-1));
-      }
-    }
-
-    const ch = text[i];
-    if (ch === '\n') { r++; c = col; continue; }
-
-    if (c >= 0 && c < cols && z >= zGrid[r][c]) {
-      grid[r][c] = ch;
-      zGrid[r][c] = z;
-    }
-    c++;
-  }
-
-  return r; // Return last row written to (useful for tracking grid growth)
 }
 
 /**

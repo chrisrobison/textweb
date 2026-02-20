@@ -17,7 +17,6 @@ function parseArgs() {
     json: false,
     serve: false,
     cols: 100,
-    rows: 30,
     port: 3000,
     help: false
   };
@@ -48,7 +47,9 @@ function parseArgs() {
         
       case '--rows':
       case '-r':
-        options.rows = parseInt(args[++i]) || 30;
+        // Deprecated: height is dynamic (grows to fit content). Ignored.
+        console.error('Warning: --rows is deprecated. Height is dynamic (grows to fit content).');
+        args[++i]; // consume the value
         break;
         
       case '--port':
@@ -85,7 +86,7 @@ USAGE:
 
 OPTIONS:
   --cols, -c <number>                Grid width in characters (default: 100)
-  --rows, -r <number>                Grid height in characters (default: 30)
+  --rows, -r <number>                (deprecated, height is dynamic)
   --port, -p <number>                Server port (default: 3000)
   --interactive, -i                  Interactive REPL mode
   --json, -j                         JSON output format
@@ -117,7 +118,7 @@ INTERACTIVE COMMANDS:
 async function render(url, options) {
   const browser = new AgentBrowser({
     cols: options.cols,
-    rows: options.rows,
+
     headless: true
   });
 
@@ -156,7 +157,7 @@ async function render(url, options) {
 async function interactive(url, options) {
   const browser = new AgentBrowser({
     cols: options.cols,
-    rows: options.rows,
+
     headless: true
   });
 
@@ -367,7 +368,7 @@ async function serve(options) {
   
   const server = createServer({
     cols: options.cols,
-    rows: options.rows
+
   });
   
   server.listen(options.port, () => {
