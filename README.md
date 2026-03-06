@@ -92,6 +92,12 @@ npx textweb-mcp
 
 Then just ask: *"Go to hacker news and find posts about AI"* — the agent uses text grids instead of screenshots.
 
+**New (v0.2.1-style MCP capabilities):**
+- `session_id` on every tool call for isolated parallel workflows
+- `textweb_storage_save` / `textweb_storage_load` for persistent auth/session state
+- `textweb_wait_for` for multi-step async UI transitions
+- `textweb_assert_field` for flow guards before submit
+
 ### 🛠️ OpenAI / Anthropic Function Calling
 
 Drop-in tool definitions for any function-calling model. See [`tools/tool_definitions.json`](tools/tool_definitions.json).
@@ -179,6 +185,10 @@ console.log(meta.stats);  // { totalElements, interactiveElements, renderMs }
 await browser.click(3);              // Click element [3]
 await browser.type(7, 'hello');      // Type into element [7]
 await browser.scroll('down');        // Scroll down
+await browser.waitFor({ selector: '.step-2.active' }); // Wait for next step
+await browser.assertField(7, 'hello', { comparator: 'equals' }); // Validate field state
+await browser.saveStorageState('/tmp/textweb-state.json');
+await browser.loadStorageState('/tmp/textweb-state.json');
 await browser.query('nav a');        // Find elements by CSS selector
 await browser.screenshot();          // PNG buffer (for debugging)
 console.log(browser.getCurrentUrl());// Current page URL
@@ -238,20 +248,50 @@ TextWeb builds stable CSS selectors for each interactive element, preferring res
 
 This means selectors survive DOM changes between snapshots — critical for multi-step agent workflows.
 
+## ATS Workflow Examples (Greenhouse / Lever)
+
+For multi-step ATS flows, use a stable `session_id` and combine wait/assert guards:
+
+```javascript
+// Keep one session for the whole application
+await textweb_navigate({ url: 'https://job-boards.greenhouse.io/acme/jobs/123', session_id: 'apply-acme' });
+
+// Fill + continue
+await textweb_type({ ref: 12, text: 'Christopher', session_id: 'apply-acme' });
+await textweb_type({ ref: 15, text: 'Robison', session_id: 'apply-acme' });
+await textweb_click({ ref: 42, session_id: 'apply-acme', retries: 3, retry_delay_ms: 400 });
+
+// Guard transition
+await textweb_wait_for({ selector: '#step-2.active', timeout_ms: 8000, session_id: 'apply-acme', retries: 2 });
+
+// Validate before submit
+await textweb_assert_field({ ref: 77, expected: 'San Francisco', comparator: 'includes', session_id: 'apply-acme' });
+
+// Persist auth/session for follow-up flow
+await textweb_storage_save({ path: '/tmp/ats-state.json', session_id: 'apply-acme' });
+```
+
+Useful session tools:
+- `textweb_session_list` → inspect active sessions
+- `textweb_session_close` → close one session or all
+
 ## Testing
 
 ```bash
-# Run all tests (81 total)
+# Run all tests (form + live + ATS e2e)
 npm test
 
-# Form fixture tests only (60 tests)
+# Form fixture tests
 npm run test:form
 
-# Live site tests — example.com, HN, Wikipedia (21 tests)
+# Live site tests — example.com, HN, Wikipedia
 npm run test:live
+
+# ATS multi-step fixture test
+npm run test:ats
 ```
 
-Test fixtures are in `test/fixtures/` — includes a comprehensive HTML form with all input types, tables, navigation, and dynamic content.
+Test fixtures are in `test/fixtures/` — includes a comprehensive HTML form and an ATS-style multi-step application fixture.
 
 ## Design Principles
 

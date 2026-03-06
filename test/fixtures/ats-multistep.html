@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Greenhouse-Style ATS Multi-Step Fixture</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 20px; }
+    .step { display: none; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 16px; }
+    .step.active { display: block; }
+    label { display:block; font-weight: 600; margin-top: 12px; }
+    input, select, textarea, button { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .actions { display:flex; gap: 10px; margin-top: 16px; }
+    .actions button { width: auto; }
+    .hidden { display:none; }
+    .ok { color: #0a7c1f; font-weight: 700; }
+    .error { color: #c1121f; }
+  </style>
+</head>
+<body>
+  <h1>Apply for this job</h1>
+  <p>Fixture emulates a multi-step ATS flow with validation + final confirmation.</p>
+
+  <section id="step-1" class="step active" data-testid="step-1">
+    <h2>Step 1 — Contact</h2>
+    <div class="row">
+      <div>
+        <label for="first-name">First Name *</label>
+        <input id="first-name" name="firstName" type="text" required />
+      </div>
+      <div>
+        <label for="last-name">Last Name *</label>
+        <input id="last-name" name="lastName" type="text" required />
+      </div>
+    </div>
+
+    <label for="email">Email *</label>
+    <input id="email" name="email" type="email" required />
+
+    <label for="phone">Phone</label>
+    <input id="phone" name="phone" type="tel" />
+
+    <p id="step1-error" class="error hidden">Please fill First Name, Last Name, and Email.</p>
+
+    <div class="actions">
+      <button id="next-btn" type="button">Continue to Step 2</button>
+    </div>
+  </section>
+
+  <section id="step-2" class="step" data-testid="step-2">
+    <h2>Step 2 — Profile</h2>
+
+    <label for="location">Location (City) *</label>
+    <input id="location" name="location" type="text" required />
+
+    <label for="authorized">Authorized to work? *</label>
+    <select id="authorized" name="authorized" required>
+      <option value="">Select...</option>
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
+
+    <label for="resume">Resume/CV *</label>
+    <input id="resume" name="resume" type="file" accept=".pdf,.doc,.docx" required />
+
+    <label for="notes">Additional Information</label>
+    <textarea id="notes" name="notes"></textarea>
+
+    <p id="step2-error" class="error hidden">Please fill required fields and upload a resume.</p>
+
+    <div class="actions">
+      <button id="back-btn" type="button">Back</button>
+      <button id="submit-btn" type="button">Submit application</button>
+    </div>
+  </section>
+
+  <section id="done" class="step" data-testid="done">
+    <h2 class="ok">Thank you for applying.</h2>
+    <p>Your application has been received.</p>
+  </section>
+
+  <script>
+    const step1 = document.getElementById('step-1');
+    const step2 = document.getElementById('step-2');
+    const done = document.getElementById('done');
+
+    const step1Error = document.getElementById('step1-error');
+    const step2Error = document.getElementById('step2-error');
+
+    function show(section) {
+      [step1, step2, done].forEach(s => s.classList.remove('active'));
+      section.classList.add('active');
+    }
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      const first = document.getElementById('first-name').value.trim();
+      const last = document.getElementById('last-name').value.trim();
+      const email = document.getElementById('email').value.trim();
+
+      if (!first || !last || !email) {
+        step1Error.classList.remove('hidden');
+        return;
+      }
+
+      step1Error.classList.add('hidden');
+      // simulate async transition
+      setTimeout(() => show(step2), 250);
+    });
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      show(step1);
+    });
+
+    document.getElementById('submit-btn').addEventListener('click', () => {
+      const location = document.getElementById('location').value.trim();
+      const authorized = document.getElementById('authorized').value;
+      const resume = document.getElementById('resume').files.length;
+
+      if (!location || !authorized || !resume) {
+        step2Error.classList.remove('hidden');
+        return;
+      }
+
+      step2Error.classList.add('hidden');
+      setTimeout(() => show(done), 250);
+    });
+  </script>
+</body>
+</html>

@@ -6,16 +6,30 @@
       "type": "function",
       "function": {
         "name": "textweb_navigate",
-        "description": "Navigate to a URL and render the page as a structured text grid. Interactive elements are annotated with [ref] numbers. Returns the text view (~2-5KB) instead of a screenshot (~1MB). No vision model needed.",
+        "description": "Navigate to a URL and render the page as a structured text grid.",
         "parameters": {
           "type": "object",
           "properties": {
             "url": {
               "type": "string",
               "description": "The URL to navigate to"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            },
+            "retries": {
+              "type": "integer",
+              "description": "Retry attempts for flaky transitions"
+            },
+            "retry_delay_ms": {
+              "type": "integer",
+              "description": "Delay between retries in ms"
             }
           },
-          "required": ["url"]
+          "required": [
+            "url"
+          ]
         }
       }
     },
@@ -23,16 +37,30 @@
       "type": "function",
       "function": {
         "name": "textweb_click",
-        "description": "Click an interactive element identified by its [ref] number from the text grid.",
+        "description": "Click an interactive element identified by its [ref] number.",
         "parameters": {
           "type": "object",
           "properties": {
             "ref": {
               "type": "integer",
               "description": "Element reference number (e.g., 3 for [3])"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            },
+            "retries": {
+              "type": "integer",
+              "description": "Retry attempts for flaky transitions"
+            },
+            "retry_delay_ms": {
+              "type": "integer",
+              "description": "Delay between retries in ms"
             }
           },
-          "required": ["ref"]
+          "required": [
+            "ref"
+          ]
         }
       }
     },
@@ -40,7 +68,7 @@
       "type": "function",
       "function": {
         "name": "textweb_type",
-        "description": "Type text into an input field identified by its [ref] number. Replaces existing content.",
+        "description": "Type text into an input field identified by its [ref] number.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -51,9 +79,24 @@
             "text": {
               "type": "string",
               "description": "Text to enter into the field"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            },
+            "retries": {
+              "type": "integer",
+              "description": "Retry attempts for flaky transitions"
+            },
+            "retry_delay_ms": {
+              "type": "integer",
+              "description": "Delay between retries in ms"
             }
           },
-          "required": ["ref", "text"]
+          "required": [
+            "ref",
+            "text"
+          ]
         }
       }
     },
@@ -72,60 +115,24 @@
             "value": {
               "type": "string",
               "description": "Option value or visible text to select"
-            }
-          },
-          "required": ["ref", "value"]
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "textweb_scroll",
-        "description": "Scroll the current page. Returns the updated text grid.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "direction": {
-              "type": "string",
-              "enum": ["up", "down", "top"],
-              "description": "Scroll direction"
             },
-            "amount": {
-              "type": "integer",
-              "description": "Pages to scroll (default: 1)",
-              "default": 1
-            }
-          },
-          "required": ["direction"]
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "textweb_snapshot",
-        "description": "Re-render the current page without navigating. Use after waiting for dynamic content.",
-        "parameters": {
-          "type": "object",
-          "properties": {}
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "textweb_press",
-        "description": "Press a keyboard key (Enter, Tab, Escape, ArrowDown, etc.).",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "key": {
+            "session_id": {
               "type": "string",
-              "description": "Key name (e.g., 'Enter', 'Tab', 'Escape')"
+              "description": "Optional session id (default: default)"
+            },
+            "retries": {
+              "type": "integer",
+              "description": "Retry attempts for flaky transitions"
+            },
+            "retry_delay_ms": {
+              "type": "integer",
+              "description": "Delay between retries in ms"
             }
           },
-          "required": ["key"]
+          "required": [
+            "ref",
+            "value"
+          ]
         }
       }
     },
@@ -144,9 +151,277 @@
             "path": {
               "type": "string",
               "description": "Absolute file path to upload"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            },
+            "retries": {
+              "type": "integer",
+              "description": "Retry attempts for flaky transitions"
+            },
+            "retry_delay_ms": {
+              "type": "integer",
+              "description": "Delay between retries in ms"
             }
           },
-          "required": ["ref", "path"]
+          "required": [
+            "ref",
+            "path"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_press",
+        "description": "Press a keyboard key (Enter, Tab, Escape, ArrowDown, etc.).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Key name (e.g., Enter, Tab, Escape)"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            },
+            "retries": {
+              "type": "integer",
+              "description": "Retry attempts for flaky transitions"
+            },
+            "retry_delay_ms": {
+              "type": "integer",
+              "description": "Delay between retries in ms"
+            }
+          },
+          "required": [
+            "key"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_scroll",
+        "description": "Scroll the current page.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down",
+                "top"
+              ],
+              "description": "Scroll direction"
+            },
+            "amount": {
+              "type": "integer",
+              "description": "Pages to scroll (default: 1)",
+              "default": 1
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_snapshot",
+        "description": "Re-render the current page without navigating.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_storage_save",
+        "description": "Save cookies/localStorage/sessionStorage to a storageState JSON file.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Absolute output path for storage state JSON"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_storage_load",
+        "description": "Load cookies/localStorage/sessionStorage from a storageState JSON file.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Absolute storage state path"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_wait_for",
+        "description": "Wait for selector/text/url state during multi-step flows.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "selector": {
+              "type": "string",
+              "description": "CSS selector to wait for"
+            },
+            "text": {
+              "type": "string",
+              "description": "Page text to wait for"
+            },
+            "url_includes": {
+              "type": "string",
+              "description": "Substring expected in URL"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "attached",
+                "detached",
+                "visible",
+                "hidden"
+              ],
+              "description": "Selector state"
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "description": "Timeout milliseconds"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            },
+            "retries": {
+              "type": "integer",
+              "description": "Retry attempts for flaky transitions"
+            },
+            "retry_delay_ms": {
+              "type": "integer",
+              "description": "Delay between retries in ms"
+            },
+            "poll_ms": {
+              "type": "integer",
+              "description": "Polling interval for text/url waits"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_assert_field",
+        "description": "Assert field value/text by element ref.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "integer",
+              "description": "Element reference number"
+            },
+            "expected": {
+              "type": "string",
+              "description": "Expected value or content"
+            },
+            "comparator": {
+              "type": "string",
+              "enum": [
+                "equals",
+                "includes",
+                "regex",
+                "not_empty"
+              ],
+              "description": "Comparison mode"
+            },
+            "attribute": {
+              "type": "string",
+              "description": "Optional attribute to assert"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Optional session id (default: default)"
+            }
+          },
+          "required": [
+            "ref",
+            "expected"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_session_list",
+        "description": "List active textweb sessions and metadata.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "textweb_session_close",
+        "description": "Close one session by session_id, or all sessions when all=true.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "description": "Session id to close (default: default)"
+            },
+            "all": {
+              "type": "boolean",
+              "description": "Close all active sessions"
+            }
+          }
         }
       }
     }

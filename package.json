@@ -1,6 +1,6 @@
 {
   "name": "textweb",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "A text-grid web renderer for AI agents — see the web without screenshots",
   "main": "src/browser.js",
   "bin": {
@@ -10,9 +10,10 @@
   "scripts": {
     "start": "node src/cli.js",
     "serve": "node src/server.js",
-    "test": "node test/test-form.js && node test/test-live.js",
+    "test": "node test/test-form.js && node test/test-live.js && node test/test-ats-e2e.js",
     "test:form": "node test/test-form.js",
-    "test:live": "node test/test-live.js"
+    "test:live": "node test/test-live.js",
+    "test:ats": "node test/test-ats-e2e.js"
   },
   "keywords": [
     "ai",

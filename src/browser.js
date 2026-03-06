@@ -3,6 +3,10 @@
  */
 
 const { chromium } = require('playwright');
+
+const DEFAULT_VIEWPORT = { width: 1280, height: 800 };
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
 const { render } = require('./renderer');
 
 class AgentBrowser {
@@ -15,32 +19,75 @@ class AgentBrowser {
     this.lastResult = null;
     this.headless = options.headless !== false;
     this.charH = 16; // default, updated after first render
+    this.defaultTimeout = options.timeout || 30000;
+    this.defaultRetries = options.retries ?? 2;
+    this.defaultRetryDelayMs = options.retryDelayMs ?? 250;
   }
 
-  async launch() {
-    this.browser = await chromium.launch({
-      headless: this.headless,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    this.context = await this.browser.newContext({
-      viewport: { width: 1280, height: 800 },
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    });
+  async _withRetries(actionName, fn, options = {}) {
+    const retries = options.retries ?? this.defaultRetries;
+    const retryDelayMs = options.retryDelayMs ?? this.defaultRetryDelayMs;
+
+    let lastError = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastError = err;
+        if (attempt >= retries) break;
+        await new Promise(r => setTimeout(r, retryDelayMs));
+      }
+    }
+
+    throw new Error(`${actionName} failed after ${retries + 1} attempt(s): ${lastError?.message || 'unknown error'}`);
+  }
+
+  _contextOptions(storageStatePath = null) {
+    const opts = {
+      viewport: DEFAULT_VIEWPORT,
+      userAgent: DEFAULT_USER_AGENT,
+    };
+    if (storageStatePath) {
+      opts.storageState = storageStatePath;
+    }
+    return opts;
+  }
+
+  async _createContext(storageStatePath = null) {
+    this.context = await this.browser.newContext(this._contextOptions(storageStatePath));
     this.page = await this.context.newPage();
-    this.page.setDefaultTimeout(30000);
+    this.page.setDefaultTimeout(this.defaultTimeout);
+  }
+
+  async launch(options = {}) {
+    if (!this.browser) {
+      this.browser = await chromium.launch({
+        headless: this.headless,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+    }
+
+    if (!this.context) {
+      await this._createContext(options.storageStatePath || null);
+    }
+
     return this;
   }
 
-  async navigate(url) {
+  async navigate(url, options = {}) {
     if (!this.page) await this.launch();
     this.scrollY = 0;
-    // Use domcontentloaded + a short settle, not networkidle (SPAs never go idle)
-    await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    // Wait for network to settle or 3s max — whichever comes first
-    await Promise.race([
-      this.page.waitForLoadState('networkidle').catch(() => {}),
-      new Promise(r => setTimeout(r, 3000)),
-    ]);
+
+    await this._withRetries('navigate', async () => {
+      // Use domcontentloaded + a short settle, not networkidle (SPAs never go idle)
+      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs || this.defaultTimeout });
+      // Wait for network to settle or 3s max — whichever comes first
+      await Promise.race([
+        this.page.waitForLoadState('networkidle').catch(() => {}),
+        new Promise(r => setTimeout(r, 3000)),
+      ]);
+    }, options);
+
     return await this.snapshot();
   }
 
@@ -57,17 +104,21 @@ class AgentBrowser {
     return this.lastResult;
   }
 
-  async click(ref) {
+  async click(ref, options = {}) {
     const el = this._getElement(ref);
-    await this.page.click(el.selector);
-    await this._settle();
+    await this._withRetries(`click ref=${ref}`, async () => {
+      await this.page.click(el.selector);
+      await this._settle();
+    }, options);
     return await this.snapshot();
   }
 
-  async type(ref, text) {
+  async type(ref, text, options = {}) {
     const el = this._getElement(ref);
-    await this.page.click(el.selector);
-    await this.page.fill(el.selector, text);
+    await this._withRetries(`type ref=${ref}`, async () => {
+      await this.page.click(el.selector);
+      await this.page.fill(el.selector, text);
+    }, options);
     return await this.snapshot();
   }
 
@@ -101,22 +152,28 @@ class AgentBrowser {
     await this.page.setInputFiles(selector, paths);
   }
 
-  async press(key) {
-    await this.page.keyboard.press(key);
-    await this._settle();
+  async press(key, options = {}) {
+    await this._withRetries(`press key=${key}`, async () => {
+      await this.page.keyboard.press(key);
+      await this._settle();
+    }, options);
     return await this.snapshot();
   }
 
-  async upload(ref, filePaths) {
+  async upload(ref, filePaths, options = {}) {
     const el = this._getElement(ref);
     const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
-    await this.page.setInputFiles(el.selector, paths);
+    await this._withRetries(`upload ref=${ref}`, async () => {
+      await this.page.setInputFiles(el.selector, paths);
+    }, options);
     return await this.snapshot();
   }
 
-  async select(ref, value) {
+  async select(ref, value, options = {}) {
     const el = this._getElement(ref);
-    await this.page.selectOption(el.selector, value);
+    await this._withRetries(`select ref=${ref}`, async () => {
+      await this.page.selectOption(el.selector, value);
+    }, options);
     return await this.snapshot();
   }
 
@@ -146,8 +203,148 @@ class AgentBrowser {
     return region.join('\n');
   }
 
-  async evaluate(fn) {
-    return await this.page.evaluate(fn);
+  async evaluate(fn, arg) {
+    return await this.page.evaluate(fn, arg);
+  }
+
+  /**
+   * Save cookies/localStorage/sessionStorage state to disk
+   */
+  async saveStorageState(path) {
+    if (!this.context) throw new Error('No browser context open.');
+    await this.context.storageState({ path });
+    return { saved: true, path };
+  }
+
+  /**
+   * Load cookies/localStorage/sessionStorage state from disk into a fresh context
+   */
+  async loadStorageState(path) {
+    if (!this.browser) {
+      await this.launch();
+    }
+
+    if (this.context) {
+      await this.context.close();
+      this.context = null;
+      this.page = null;
+    }
+
+    await this._createContext(path);
+    this.scrollY = 0;
+    this.lastResult = null;
+    return { loaded: true, path };
+  }
+
+  /**
+   * Wait until one or more conditions are true, then return a fresh snapshot.
+   * Supported conditions: selector, text, urlIncludes.
+   */
+  async waitFor(options = {}) {
+    if (!this.page) throw new Error('No page open. Call navigate() first.');
+
+    const timeout = options.timeoutMs || this.defaultTimeout;
+    const pollMs = options.pollMs || 100;
+
+    await this._withRetries('waitFor', async () => {
+      const waits = [];
+
+      if (options.selector) {
+        waits.push(
+          this.page.waitForSelector(options.selector, {
+            state: options.state || 'visible',
+            timeout,
+          })
+        );
+      }
+
+      if (options.text) {
+        waits.push(
+          this.page.waitForFunction(
+            (text) => document.body && document.body.innerText.includes(text),
+            options.text,
+            { timeout, polling: pollMs }
+          )
+        );
+      }
+
+      if (options.urlIncludes) {
+        waits.push(
+          this.page.waitForFunction(
+            (needle) => window.location.href.includes(needle),
+            options.urlIncludes,
+            { timeout, polling: pollMs }
+          )
+        );
+      }
+
+      if (!waits.length) {
+        await this.page.waitForTimeout(timeout);
+      } else {
+        await Promise.all(waits);
+      }
+    }, options);
+
+    await this._settle();
+    return await this.snapshot();
+  }
+
+  /**
+   * Assert a field's value/text by ref.
+   * comparator: equals | includes | regex | not_empty
+   */
+  async assertField(ref, expected, options = {}) {
+    if (!this.page) throw new Error('No page open. Call navigate() first.');
+    const el = this._getElement(ref);
+    const comparator = options.comparator || 'equals';
+    const attribute = options.attribute || null;
+
+    const actual = await this.page.evaluate(({ selector, attributeName }) => {
+      const target = document.querySelector(selector);
+      if (!target) return null;
+
+      if (attributeName) {
+        return target.getAttribute(attributeName);
+      }
+
+      const tag = (target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+        return target.value ?? '';
+      }
+      return (target.textContent || '').trim();
+    }, { selector: el.selector, attributeName: attribute });
+
+    let pass = false;
+    const actualStr = actual == null ? '' : String(actual);
+    const expectedStr = expected == null ? '' : String(expected);
+
+    switch (comparator) {
+      case 'equals':
+        pass = actualStr === expectedStr;
+        break;
+      case 'includes':
+        pass = actualStr.includes(expectedStr);
+        break;
+      case 'regex': {
+        const re = new RegExp(expectedStr);
+        pass = re.test(actualStr);
+        break;
+      }
+      case 'not_empty':
+        pass = actualStr.trim().length > 0;
+        break;
+      default:
+        throw new Error(`Unknown comparator: ${comparator}`);
+    }
+
+    return {
+      pass,
+      ref,
+      selector: el.selector,
+      comparator,
+      expected: expectedStr,
+      actual: actualStr,
+    };
   }
 
   async close() {

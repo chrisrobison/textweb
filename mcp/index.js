@@ -2,11 +2,11 @@
 
 /**
  * TextWeb MCP Server
- * 
+ *
  * Model Context Protocol server that gives any MCP client
  * (Claude Desktop, Cursor, Windsurf, Cline, OpenClaw, etc.)
  * text-based web browsing capabilities.
- * 
+ *
  * Communicates over stdio using JSON-RPC 2.0.
  */
 
@@ -14,8 +14,10 @@ const { AgentBrowser } = require('../src/browser');
 
 const SERVER_INFO = {
   name: 'textweb',
-  version: '0.1.0',
+  version: '0.2.2',
 };
+
+const SESSION_NOTE = 'Optional session_id to isolate state across flows. Defaults to "default".';
 
 const TOOLS = [
   {
@@ -26,6 +28,9 @@ const TOOLS = [
       properties: {
         url: { type: 'string', description: 'The URL to navigate to' },
         cols: { type: 'number', description: 'Grid width in characters (default: 120)' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+        retries: { type: 'number', description: 'Retry attempts for flaky transitions' },
+        retry_delay_ms: { type: 'number', description: 'Delay between retries in ms' },
       },
       required: ['url'],
     },
@@ -37,6 +42,9 @@ const TOOLS = [
       type: 'object',
       properties: {
         ref: { type: 'number', description: 'Element reference number from the text grid (e.g., 3 for [3])' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+        retries: { type: 'number', description: 'Retry attempts for flaky transitions' },
+        retry_delay_ms: { type: 'number', description: 'Delay between retries in ms' },
       },
       required: ['ref'],
     },
@@ -49,6 +57,9 @@ const TOOLS = [
       properties: {
         ref: { type: 'number', description: 'Element reference number of the input field' },
         text: { type: 'string', description: 'Text to type into the field' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+        retries: { type: 'number', description: 'Retry attempts for flaky transitions' },
+        retry_delay_ms: { type: 'number', description: 'Delay between retries in ms' },
       },
       required: ['ref', 'text'],
     },
@@ -61,6 +72,9 @@ const TOOLS = [
       properties: {
         ref: { type: 'number', description: 'Element reference number of the select/dropdown' },
         value: { type: 'string', description: 'Value or visible text of the option to select' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+        retries: { type: 'number', description: 'Retry attempts for flaky transitions' },
+        retry_delay_ms: { type: 'number', description: 'Delay between retries in ms' },
       },
       required: ['ref', 'value'],
     },
@@ -73,6 +87,7 @@ const TOOLS = [
       properties: {
         direction: { type: 'string', enum: ['up', 'down', 'top'], description: 'Scroll direction' },
         amount: { type: 'number', description: 'Number of pages to scroll (default: 1)' },
+        session_id: { type: 'string', description: SESSION_NOTE },
       },
       required: ['direction'],
     },
@@ -82,7 +97,9 @@ const TOOLS = [
     description: 'Re-render the current page as a text grid without navigating. Useful after waiting for dynamic content to load.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        session_id: { type: 'string', description: SESSION_NOTE },
+      },
     },
   },
   {
@@ -92,8 +109,30 @@ const TOOLS = [
       type: 'object',
       properties: {
         key: { type: 'string', description: 'Key to press (e.g., "Enter", "Tab", "Escape", "ArrowDown")' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+        retries: { type: 'number', description: 'Retry attempts for flaky transitions' },
+        retry_delay_ms: { type: 'number', description: 'Delay between retries in ms' },
       },
       required: ['key'],
+    },
+  },
+  {
+    name: 'textweb_session_list',
+    description: 'List active textweb sessions and basic metadata (url, age).',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'textweb_session_close',
+    description: 'Close one session by session_id, or all sessions when all=true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string', description: 'Session id to close (default: default)' },
+        all: { type: 'boolean', description: 'Close all active sessions' },
+      },
     },
   },
   {
@@ -104,22 +143,93 @@ const TOOLS = [
       properties: {
         ref: { type: 'number', description: 'Element reference number of the file input' },
         path: { type: 'string', description: 'Absolute path to the file to upload' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+        retries: { type: 'number', description: 'Retry attempts for flaky transitions' },
+        retry_delay_ms: { type: 'number', description: 'Delay between retries in ms' },
       },
       required: ['ref', 'path'],
     },
   },
+  {
+    name: 'textweb_storage_save',
+    description: 'Save current browser storage state (cookies/localStorage/sessionStorage) to disk for later restore.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Absolute path to write storage state JSON' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'textweb_storage_load',
+    description: 'Load storage state from disk into a fresh browser context.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Absolute path of previously saved storage state JSON' },
+        cols: { type: 'number', description: 'Grid width in characters (default: 120)' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'textweb_wait_for',
+    description: 'Wait for UI state in multi-step flows. Supports selector, text, and url_includes checks.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: { type: 'string', description: 'CSS selector that must appear (or match state)' },
+        text: { type: 'string', description: 'Text that must appear in page body' },
+        url_includes: { type: 'string', description: 'Substring that must appear in current URL' },
+        state: { type: 'string', enum: ['attached', 'detached', 'visible', 'hidden'], description: 'Selector wait state (default: visible)' },
+        timeout_ms: { type: 'number', description: 'Timeout in milliseconds (default: 30000)' },
+        poll_ms: { type: 'number', description: 'Polling interval for text/url waits (default: 100)' },
+        retries: { type: 'number', description: 'Retry attempts for flaky transitions' },
+        retry_delay_ms: { type: 'number', description: 'Delay between retries in ms' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+      },
+    },
+  },
+  {
+    name: 'textweb_assert_field',
+    description: 'Assert a field value/text by element ref. Useful in multi-step forms before submitting.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'number', description: 'Element reference number from current snapshot' },
+        expected: { type: 'string', description: 'Expected value/content' },
+        comparator: { type: 'string', enum: ['equals', 'includes', 'regex', 'not_empty'], description: 'Comparison mode (default: equals)' },
+        attribute: { type: 'string', description: 'Optional DOM attribute name to validate (e.g., aria-invalid)' },
+        session_id: { type: 'string', description: SESSION_NOTE },
+      },
+      required: ['ref', 'expected'],
+    },
+  },
 ];
 
-// ─── Browser Instance ────────────────────────────────────────────────────────
+// ─── Browser Sessions ───────────────────────────────────────────────────────
 
-let browser = null;
+/** @type {Map<string, AgentBrowser>} */
+const sessions = new Map();
 
-async function getBrowser(cols) {
+function resolveSessionId(args = {}) {
+  return (args.session_id || 'default').trim() || 'default';
+}
+
+async function getBrowser(args = {}) {
+  const sessionId = resolveSessionId(args);
+  let browser = sessions.get(sessionId);
+
   if (!browser) {
-    browser = new AgentBrowser({ cols: cols || 120, headless: true });
+    browser = new AgentBrowser({ cols: args.cols || 120, headless: true });
     await browser.launch();
+    sessions.set(sessionId, browser);
   }
-  return browser;
+
+  return { browser, sessionId };
 }
 
 function formatResult(result) {
@@ -130,26 +240,78 @@ function formatResult(result) {
   return `URL: ${result.meta?.url || 'unknown'}\nTitle: ${result.meta?.title || 'unknown'}\nRefs: ${result.meta?.totalRefs || 0}\n\n${result.view}\n\nInteractive elements:\n${refs}`;
 }
 
+function retryOptions(args = {}) {
+  return {
+    retries: args.retries,
+    retryDelayMs: args.retry_delay_ms,
+  };
+}
+
+async function listSessions() {
+  const out = [];
+  for (const [sessionId, browser] of sessions.entries()) {
+    out.push({
+      session_id: sessionId,
+      url: browser.getCurrentUrl() || null,
+      initialized: Boolean(browser.page),
+      refs: browser.lastResult?.meta?.totalRefs ?? null,
+    });
+  }
+  return out;
+}
+
+async function closeSession({ session_id, all } = {}) {
+  if (all) {
+    const closed = [];
+    for (const [sid, browser] of sessions.entries()) {
+      await browser.close();
+      closed.push(sid);
+    }
+    sessions.clear();
+    return { closed };
+  }
+
+  const sid = (session_id || 'default').trim() || 'default';
+  const browser = sessions.get(sid);
+  if (!browser) {
+    return { closed: [], missing: [sid] };
+  }
+
+  await browser.close();
+  sessions.delete(sid);
+  return { closed: [sid] };
+}
+
 // ─── Tool Execution ──────────────────────────────────────────────────────────
 
-async function executeTool(name, args) {
-  const b = await getBrowser(args.cols);
+async function executeTool(name, args = {}) {
+  if (name === 'textweb_session_list') {
+    const active = await listSessions();
+    return JSON.stringify({ count: active.length, sessions: active }, null, 2);
+  }
+
+  if (name === 'textweb_session_close') {
+    const out = await closeSession({ session_id: args.session_id, all: args.all });
+    return JSON.stringify(out, null, 2);
+  }
+
+  const { browser: b, sessionId } = await getBrowser(args);
 
   switch (name) {
     case 'textweb_navigate': {
-      const result = await b.navigate(args.url);
+      const result = await b.navigate(args.url, retryOptions(args));
       return formatResult(result);
     }
     case 'textweb_click': {
-      const result = await b.click(args.ref);
+      const result = await b.click(args.ref, retryOptions(args));
       return formatResult(result);
     }
     case 'textweb_type': {
-      const result = await b.type(args.ref, args.text);
+      const result = await b.type(args.ref, args.text, retryOptions(args));
       return formatResult(result);
     }
     case 'textweb_select': {
-      const result = await b.select(args.ref, args.value);
+      const result = await b.select(args.ref, args.value, retryOptions(args));
       return formatResult(result);
     }
     case 'textweb_scroll': {
@@ -161,12 +323,39 @@ async function executeTool(name, args) {
       return formatResult(result);
     }
     case 'textweb_press': {
-      const result = await b.press(args.key);
+      const result = await b.press(args.key, retryOptions(args));
       return formatResult(result);
     }
     case 'textweb_upload': {
-      const result = await b.upload(args.ref, args.path);
+      const result = await b.upload(args.ref, args.path, retryOptions(args));
       return formatResult(result);
+    }
+    case 'textweb_storage_save': {
+      const out = await b.saveStorageState(args.path);
+      return `Saved storage state for session "${sessionId}" to ${out.path}`;
+    }
+    case 'textweb_storage_load': {
+      const out = await b.loadStorageState(args.path);
+      return `Loaded storage state for session "${sessionId}" from ${out.path}`;
+    }
+    case 'textweb_wait_for': {
+      const result = await b.waitFor({
+        selector: args.selector,
+        text: args.text,
+        urlIncludes: args.url_includes,
+        timeoutMs: args.timeout_ms,
+        pollMs: args.poll_ms,
+        state: args.state,
+        ...retryOptions(args),
+      });
+      return formatResult(result);
+    }
+    case 'textweb_assert_field': {
+      const out = await b.assertField(args.ref, args.expected, {
+        comparator: args.comparator,
+        attribute: args.attribute,
+      });
+      return `ASSERT ${out.pass ? 'PASS' : 'FAIL'} | ref=${out.ref} | comparator=${out.comparator} | expected="${out.expected}" | actual="${out.actual}" | selector=${out.selector}`;
     }
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -232,7 +421,7 @@ function main() {
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', async (chunk) => {
     buffer += chunk;
-    
+
     // Process complete lines (newline-delimited JSON)
     const lines = buffer.split('\n');
     buffer = lines.pop(); // Keep incomplete line in buffer
@@ -257,17 +446,18 @@ function main() {
   });
 
   process.stdin.on('end', async () => {
-    if (browser) await browser.close();
+    for (const [, browser] of sessions) {
+      await browser.close();
+    }
+    sessions.clear();
     process.exit(0);
   });
 
   process.on('SIGINT', async () => {
-    if (browser) await browser.close();
-    process.exit(0);
-  });
-
-  process.on('SIGTERM', async () => {
-    if (browser) await browser.close();
+    for (const [, browser] of sessions) {
+      await browser.close();
+    }
+    sessions.clear();
     process.exit(0);
   });
 }
