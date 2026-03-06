@@ -1,6 +1,6 @@
 {
   "name": "textweb",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A text-grid web renderer for AI agents — see the web without screenshots",
   "main": "src/browser.js",
   "bin": {
