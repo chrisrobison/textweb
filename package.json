@@ -15,6 +15,14 @@
     "test:live": "node test/test-live.js",
     "test:ats": "node test/test-ats-e2e.js"
   },
+  "files": [
+    "src/",
+    "mcp/",
+    "tools/",
+    "logo.svg",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "ai",
     "agent",
