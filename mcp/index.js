@@ -11,6 +11,7 @@
  */
 
 const { AgentBrowser } = require('../src/browser');
+const { ensureBrowser } = require('../src/ensure-browser');
 
 const SERVER_INFO = {
   name: 'textweb',
@@ -462,4 +463,7 @@ function main() {
   });
 }
 
-main();
+ensureBrowser().then(main).catch((err) => {
+  process.stderr.write(`Fatal: ${err.message}\n`);
+  process.exit(1);
+});

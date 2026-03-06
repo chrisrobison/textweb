@@ -6,6 +6,7 @@
 
 const { AgentBrowser } = require('./browser');
 const { createServer } = require('./server');
+const { ensureBrowser } = require('./ensure-browser');
 const readline = require('readline');
 
 // Parse command line arguments
@@ -392,7 +393,9 @@ async function main() {
     showHelp();
     return;
   }
-  
+
+  await ensureBrowser();
+
   if (options.serve) {
     await serve(options);
   } else if (options.interactive) {
