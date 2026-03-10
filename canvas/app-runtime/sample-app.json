@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "1",
+  "app": {
+    "id": "ops-console",
+    "name": "Ops Console",
+    "mode": "user"
+  },
+  "components": [
+    {
+      "id": "welcome-panel",
+      "tagName": "tw-welcome-panel"
+    },
+    {
+      "id": "auto-form-builder",
+      "tagName": "tw-auto-form-builder"
+    },
+    {
+      "id": "manifest-editor",
+      "tagName": "tw-manifest-editor"
+    }
+  ],
+  "integrations": {
+    "serverBaseUrl": "http://localhost:3000/integrations",
+    "allowedActions": [
+      "sync_saved_form",
+      "save_manifest",
+      "upsert_nav_item",
+      "runtime_state"
+    ]
+  },
+  "events": {
+    "onLoad": [
+      {
+        "name": "publish-app-load",
+        "target": "client",
+        "topic": "app.view.load"
+      }
+    ]
+  },
+  "navigation": [
+    {
+      "id": "home",
+      "label": "Home",
+      "componentId": "welcome-panel"
+    },
+    {
+      "id": "forms",
+      "label": "Forms",
+      "children": [
+        {
+          "id": "form-builder",
+          "label": "Auto Form Builder",
+          "componentId": "auto-form-builder",
+          "events": {
+            "onSave": [
+              {
+                "name": "request-server-sync",
+                "target": "server",
+                "action": "sync_saved_form"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "children": [
+        {
+          "id": "manifest-editor",
+          "label": "Manifest Editor",
+          "componentId": "manifest-editor"
+        }
+      ]
+    }
+  ]
+}

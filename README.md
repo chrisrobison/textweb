@@ -26,10 +26,19 @@ npx playwright install chromium
 # Render any page
 textweb https://news.ycombinator.com
 
+# Explicitly request grid mode (same as default)
+textweb --output grid https://news.ycombinator.com
+
+# Semantic JSON output for agent workflows
+textweb --output semantic https://example.com
+
+# Hybrid output (grid + semantic metadata)
+textweb --output hybrid https://example.com
+
 # Interactive mode
 textweb --interactive https://github.com
 
-# JSON output for agents
+# Legacy JSON output (backward compatible)
 textweb --json https://example.com
 ```
 
@@ -176,10 +185,11 @@ curl -X POST http://localhost:3000/scroll -d '{"direction": "down"}'
 const { AgentBrowser } = require('textweb');
 
 const browser = new AgentBrowser({ cols: 120 });
-const { view, elements, meta } = await browser.navigate('https://example.com');
+const { view, elements, semantic, meta } = await browser.navigate('https://example.com');
 
 console.log(view);        // The text grid
 console.log(elements);    // { 0: { selector, tag, text, href }, ... }
+console.log(semantic);    // { mode, url, title, elements: [...] }
 console.log(meta.stats);  // { totalElements, interactiveElements, renderMs }
 
 await browser.click(3);              // Click element [3]
@@ -274,6 +284,33 @@ await textweb_storage_save({ path: '/tmp/ats-state.json', session_id: 'apply-acm
 Useful session tools:
 - `textweb_session_list` → inspect active sessions
 - `textweb_session_close` → close one session or all
+
+## App Runtime Prototype (Manifest + LARC)
+
+This repository now includes an early scaffold for a manifest-driven user runtime shell (separate from low-level raw admin tooling):
+
+- Manifest validator: `src/app-runtime/manifest.js`
+- PAN topic contract: `src/app-runtime/topics.js`
+- Runtime shell + left nav + tabbed content: `canvas/app-runtime/app-shell.html`
+- Sample manifest: `canvas/app-runtime/sample-app.json`
+
+The runtime shell uses [LARC](https://github.com/larcjs/larc) PAN (`@larcjs/core-lite`) for in-page event communication, with a local fallback bus if the module cannot be loaded.
+
+To open the prototype:
+
+```bash
+# Start API server for integration hooks (save manifest/components)
+npm run serve
+
+# In another terminal, open the runtime shell
+open /Users/cdr/Projects/textweb/canvas/app-runtime/app-shell.html
+```
+
+Integration actions implemented on the API server:
+- `POST /integrations/sync_saved_form`
+- `POST /integrations/save_manifest`
+- `POST /integrations/upsert_nav_item`
+- `POST /integrations/runtime_state`
 
 ## Testing
 

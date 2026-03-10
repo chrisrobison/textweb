@@ -56,6 +56,7 @@ async function measureCharSize(page) {
 async function extractElements(page) {
   return await page.evaluate(() => {
     const results = [];
+    const interactiveSelector = 'a[href], button, input, select, textarea, [onclick], [role="button"], [role="link"], [tabindex]:not([tabindex="-1"]), summary';
 
     function isVisible(el) {
       const style = getComputedStyle(el);
@@ -131,7 +132,24 @@ async function extractElements(page) {
     }
 
     function isInteractive(el) {
-      return el.matches('a[href], button, input, select, textarea, [onclick], [role="button"], [role="link"], [tabindex]:not([tabindex="-1"]), summary');
+      return el.matches(interactiveSelector);
+    }
+
+    function domPath(el) {
+      const parts = [];
+      let current = el;
+      while (current && current.nodeType === Node.ELEMENT_NODE && current !== document.body) {
+        const tag = current.tagName.toLowerCase();
+        let idx = 1;
+        let sib = current;
+        while ((sib = sib.previousElementSibling)) {
+          if (sib.tagName.toLowerCase() === tag) idx++;
+        }
+        parts.push(`${tag}:${idx}`);
+        current = current.parentElement;
+      }
+      parts.push('body:1');
+      return parts.reverse().join('/');
     }
 
     // Detect tables and extract their structure
@@ -203,18 +221,23 @@ async function extractElements(page) {
 
       const tag = el.tagName.toLowerCase();
       const interactive = isInteractive(el);
+      const role = el.getAttribute('role') || null;
 
       let text = '';
+      let value = null;
       if (isText) {
         text = node.textContent.trim();
       } else if (tag === 'input') {
         const type = (el.type || 'text').toLowerCase();
         text = el.value || el.placeholder || '';
+        value = el.value || '';
       } else if (tag === 'select') {
         const opt = el.options && el.options[el.selectedIndex];
         text = opt ? opt.text : '';
+        value = el.value || '';
       } else if (tag === 'textarea') {
         text = el.value || el.placeholder || '';
+        value = el.value || '';
       } else if (tag === 'img') {
         text = el.alt || '[img]';
       } else if (tag === 'hr') {
@@ -286,14 +309,28 @@ async function extractElements(page) {
         }
       }
 
+      const parentElement = el.parentElement;
+      const parentInteractive = !!(parentElement && parentElement.matches(interactiveSelector));
+      const parentPath = parentElement ? domPath(parentElement) : null;
+
       results.push({
         text,
         label: label || '',
+        role,
         tag,
         semantic,
         headingLevel: headingMatch ? parseInt(headingMatch[1]) : 0,
         interactive,
+        isTextNode: isText,
         checked: !!el.checked,
+        selected: !!el.selected,
+        disabled: !!el.disabled,
+        required: !!el.required,
+        expanded: el.getAttribute('aria-expanded') === 'true',
+        placeholder: el.getAttribute('placeholder') || null,
+        name: el.getAttribute('name') || '',
+        alt: el.getAttribute('alt') || '',
+        value,
         x: rect.x,
         y: rect.y,
         w: rect.width,
@@ -301,6 +338,9 @@ async function extractElements(page) {
         z: getZIndex(el),
         href: el.href || null,
         selector: buildSelector(el),
+        domPath: domPath(el),
+        parentPath,
+        parentInteractive,
         tableCell,
       });
     }
@@ -309,6 +349,103 @@ async function extractElements(page) {
     results.sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
     return results;
   });
+}
+
+function stableHash(input) {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash) + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function buildSemanticModel(rawElements, layoutEntries, pageMeta) {
+  const layoutByDomPath = new Map();
+  for (const item of layoutEntries || []) {
+    const key = item.domPath || `${item.selector}|${item.x}|${item.y}`;
+    layoutByDomPath.set(key, item);
+  }
+
+  const elements = [];
+  const byPath = new Map();
+  const rawByPath = new Map();
+  const identityCounts = new Map();
+
+  for (let i = 0; i < rawElements.length; i++) {
+    const el = rawElements[i];
+    rawByPath.set(el.domPath, el);
+    const name = (el.label || el.text || el.alt || el.name || '').trim();
+    const baseSeed = [
+      el.semantic || 'unknown',
+      el.role || '',
+      name.toLowerCase(),
+      el.parentPath || '',
+      el.domPath || '',
+    ].join('|');
+    const ordinal = identityCounts.get(baseSeed) || 0;
+    identityCounts.set(baseSeed, ordinal + 1);
+    const id = `e_${stableHash(`${baseSeed}|${ordinal}`).slice(0, 8)}`;
+
+    const layoutKey = el.domPath || `${el.selector}|${el.x}|${el.y}`;
+    const layout = layoutByDomPath.get(layoutKey);
+    const semanticEl = {
+      id,
+      type: el.semantic || 'text',
+      role: el.role || null,
+      name: name || null,
+      text: el.text || null,
+      value: el.value ?? null,
+      href: el.href || null,
+      placeholder: el.placeholder || null,
+      checked: typeof el.checked === 'boolean' ? el.checked : null,
+      selected: typeof el.selected === 'boolean' ? el.selected : null,
+      disabled: !!el.disabled,
+      required: !!el.required,
+      expanded: !!el.expanded,
+      visible: true,
+      parent_id: null,
+      children: [],
+      grid_ref: layout && layout.ref !== null ? layout.ref : null,
+      grid_bounds: layout ? {
+        row: layout.row,
+        col_start: layout.colStart,
+        col_end: layout.colEnd,
+      } : null,
+      selector: el.selector,
+      path: el.domPath,
+      // Future hooks: action routing and structural diff matching.
+      actions: el.interactive ? ['click'] : [],
+    };
+
+    if (semanticEl.type === 'input' || semanticEl.type === 'textarea' || semanticEl.type === 'select') {
+      semanticEl.actions.push('type');
+    }
+    if (semanticEl.type === 'select') {
+      semanticEl.actions.push('select');
+    }
+
+    byPath.set(el.domPath, semanticEl);
+    elements.push(semanticEl);
+  }
+
+  for (const el of elements) {
+    const raw = rawByPath.get(el.path);
+    const parentPath = raw ? raw.parentPath : null;
+    if (!parentPath) continue;
+    const parent = byPath.get(parentPath);
+    if (parent) {
+      el.parent_id = parent.id;
+      parent.children.push(el.id);
+    }
+  }
+
+  return {
+    mode: 'semantic',
+    url: pageMeta.url || null,
+    title: pageMeta.title || null,
+    elements,
+  };
 }
 
 /**
@@ -384,10 +521,12 @@ function formatElement(el, ref, cols, startCol, charW) {
  * 3. Each visual row maps to one or more grid lines
  * 4. Grid grows as needed (overflow — never lose data)
  */
-function renderGrid(elements, cols, charW, charH, scrollY = 0) {
+function renderGrid(elements, cols, charW, charH, scrollY = 0, options = {}) {
+  const { includeLayout = false } = options;
   const elementMap = {};
   let refId = 0;
   const lines = []; // output lines as strings
+  const layout = [];
 
   // Filter to viewport (vertically — allow overflow below)
   const visible = elements.filter(el => {
@@ -399,6 +538,7 @@ function renderGrid(elements, cols, charW, charH, scrollY = 0) {
   const visualRows = groupByRows(visible, charH);
 
   for (const rowElements of visualRows) {
+    const rowIndex = lines.length;
     // Sort elements in this row by X position (left to right)
     rowElements.sort((a, b) => a.x - b.x);
 
@@ -428,18 +568,35 @@ function renderGrid(elements, cols, charW, charH, scrollY = 0) {
       const display = formatElement(el, ref, cols, targetCol, charW);
       if (!display) continue;
 
+      let startCol = cursor;
       if (targetCol > cursor) {
         // Pad with spaces to reach the target column
         line += ' '.repeat(targetCol - cursor);
         cursor = targetCol;
+        startCol = cursor;
       } else if (cursor > 0 && targetCol <= cursor) {
         // Elements overlap — add a single space separator
         line += ' ';
         cursor += 1;
+        startCol = cursor;
       }
 
       line += display;
       cursor += display.length;
+
+      if (includeLayout) {
+        layout.push({
+          ref,
+          row: rowIndex,
+          colStart: startCol,
+          colEnd: cursor - 1,
+          selector: el.selector,
+          domPath: el.domPath,
+          semantic: el.semantic,
+          x: el.x,
+          y: el.y,
+        });
+      }
     }
 
     lines.push(line.trimEnd());
@@ -448,11 +605,13 @@ function renderGrid(elements, cols, charW, charH, scrollY = 0) {
   // Remove trailing empty lines
   while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
 
-  return {
+  const result = {
     view: lines.join('\n'),
     elements: elementMap,
     meta: { cols, rows: lines.length, scrollY, totalRefs: refId, charW, charH }
   };
+  if (includeLayout) result.layout = layout;
+  return result;
 }
 
 /**
@@ -468,7 +627,12 @@ async function render(page, options = {}) {
   const charH = metrics.charH;
   
   const elements = await extractElements(page);
-  const result = renderGrid(elements, cols, charW, charH, scrollY);
+  const gridResult = renderGrid(elements, cols, charW, charH, scrollY, { includeLayout: true });
+  const result = {
+    view: gridResult.view,
+    elements: gridResult.elements,
+    meta: gridResult.meta,
+  };
   
   // Add stats to meta
   result.meta.stats = {
@@ -476,8 +640,10 @@ async function render(page, options = {}) {
     interactiveElements: result.meta.totalRefs,
     renderMs: Date.now() - startMs,
   };
+
+  result.semantic = buildSemanticModel(elements, gridResult.layout || [], result.meta);
   
   return result;
 }
 
-module.exports = { render, extractElements, renderGrid, measureCharSize };
+module.exports = { render, extractElements, renderGrid, measureCharSize, buildSemanticModel };

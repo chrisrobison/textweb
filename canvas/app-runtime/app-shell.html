@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TextWeb App Runtime Shell</title>
+  <style>
+    :root {
+      --bg: #f3f5f7;
+      --panel: #ffffff;
+      --line: #d4d9de;
+      --text: #11202f;
+      --muted: #597086;
+      --accent: #0f766e;
+      --accent-soft: #d4f3ef;
+      --warn: #b45309;
+      --danger: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 20% 10%, #eefaf8 0%, var(--bg) 50%);
+      min-height: 100vh;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+
+    .nav {
+      border-right: 1px solid var(--line);
+      background: #f8fbfc;
+      padding: 16px;
+      overflow: auto;
+    }
+
+    .brand {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+      margin-bottom: 12px;
+    }
+
+    .brand h1 {
+      font-size: 16px;
+      margin: 0;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .nav-tree {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nav-item {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .nav-item.child {
+      margin-left: 14px;
+      width: calc(100% - 14px);
+      font-size: 13px;
+    }
+
+    .nav-item.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--line);
+      padding: 10px;
+      background: #fff;
+    }
+
+    .tab {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      background: #fff;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      border-color: var(--accent);
+      color: #0f172a;
+      background: var(--accent-soft);
+    }
+
+    .content {
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .status.warn { color: var(--warn); }
+    .status.err { color: var(--danger); }
+
+    textarea, input, button {
+      font: inherit;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: "SF Mono", "Menlo", monospace;
+      font-size: 12px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .primary {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .generated-form {
+      margin-top: 14px;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .generated-form label {
+      display: block;
+      margin: 8px 0 4px;
+      font-size: 13px;
+    }
+
+    .generated-form input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .nav {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="nav">
+      <div class="brand">
+        <h1 id="appTitle">Runtime Shell</h1>
+        <p id="appId">Loading manifest...</p>
+      </div>
+      <div id="navTree" class="nav-tree"></div>
+      <div id="bridgeStatus" class="status"></div>
+    </aside>
+    <main class="main">
+      <div id="tabs" class="tabs"></div>
+      <section id="content" class="content"></section>
+    </main>
+  </div>
+
+  <script src="../../src/app-runtime/manifest.js"></script>
+  <script src="../../src/app-runtime/topics.js"></script>
+  <script type="module" src="./app-shell.js"></script>
+</body>
+</html>

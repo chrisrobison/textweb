@@ -4,7 +4,10 @@
 
 const http = require('http');
 const url = require('url');
+const path = require('path');
+const fs = require('fs/promises');
 const { AgentBrowser } = require('./browser');
+const { assertValidAppManifest } = require('./app-runtime/manifest');
 
 class TextWebServer {
   constructor(options = {}) {
@@ -12,6 +15,7 @@ class TextWebServer {
       cols: options.cols || 100,
       // rows is deprecated — height is dynamic
       timeout: options.timeout || 30000,
+      appRuntimeDir: options.appRuntimeDir || path.join(process.cwd(), 'canvas', 'app-runtime'),
       ...options
     };
     
@@ -125,6 +129,18 @@ class TextWebServer {
     }
 
     try {
+      if (method === 'GET' && this.isAppRuntimePath(pathname)) {
+        return await this.handleAppRuntimeStatic(req, res, pathname);
+      }
+
+      if (pathname.startsWith('/integrations/')) {
+        if (method === 'POST') {
+          const action = decodeURIComponent(pathname.replace('/integrations/', '') || '');
+          return await this.handleIntegrationAction(req, res, action);
+        }
+        return this.sendError(res, `Method ${method} not allowed for ${pathname}`, 405);
+      }
+
       switch (pathname) {
         case '/health':
           return this.handleHealth(req, res);
@@ -362,14 +378,15 @@ class TextWebServer {
     if (typeof body.ref !== 'number') {
       return this.sendError(res, 'Element reference (ref) is required');
     }
-    if (!body.files) {
-      return this.sendError(res, 'files (string or array of file paths) is required');
+    const filePaths = body.files ?? body.path;
+    if (!filePaths) {
+      return this.sendError(res, 'files or path (string or array of file paths) is required');
     }
     if (!this.browser) {
       return this.sendError(res, 'Browser not initialized. Navigate to a page first.');
     }
     
-    const result = await this.browser.upload(body.ref, body.files);
+    const result = await this.browser.upload(body.ref, filePaths);
     
     this.sendJSON(res, {
       success: true,
@@ -468,6 +485,198 @@ class TextWebServer {
       'Access-Control-Allow-Origin': '*'
     });
     res.end(screenshot);
+  }
+
+  isAppRuntimePath(pathname) {
+    return pathname === '/' || pathname === '/app-runtime' || pathname.startsWith('/app-runtime/');
+  }
+
+  contentTypeFor(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.html') return 'text/html; charset=utf-8';
+    if (ext === '.js' || ext === '.mjs') return 'application/javascript; charset=utf-8';
+    if (ext === '.json') return 'application/json; charset=utf-8';
+    if (ext === '.css') return 'text/css; charset=utf-8';
+    if (ext === '.svg') return 'image/svg+xml';
+    return 'text/plain; charset=utf-8';
+  }
+
+  async handleAppRuntimeStatic(req, res, pathname) {
+    let relative = pathname;
+    if (relative === '/') {
+      relative = '/app-runtime/app-shell.html';
+    } else if (relative === '/app-runtime') {
+      relative = '/app-runtime/app-shell.html';
+    }
+
+    const runtimeRoot = path.resolve(this.options.appRuntimeDir);
+    const runtimeRelative = relative.replace(/^\/app-runtime\/?/, '');
+    const candidate = path.resolve(path.join(runtimeRoot, runtimeRelative));
+    if (!candidate.startsWith(runtimeRoot)) {
+      return this.sendError(res, 'Not found', 404);
+    }
+
+    try {
+      const data = await fs.readFile(candidate);
+      res.writeHead(200, {
+        'Content-Type': this.contentTypeFor(candidate),
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(data);
+    } catch (error) {
+      if (error && error.code === 'ENOENT') {
+        return this.sendError(res, 'Not found', 404);
+      }
+      throw error;
+    }
+  }
+
+  runtimePath(...segments) {
+    return path.join(this.options.appRuntimeDir, ...segments);
+  }
+
+  sanitizeFileName(name, fallback = 'app.manifest.json') {
+    const candidate = String(name || '').trim();
+    const safe = candidate
+      .replace(/[^a-zA-Z0-9._-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^\.+/, '');
+    if (!safe) return fallback;
+    return safe.endsWith('.json') ? safe : `${safe}.json`;
+  }
+
+  async readJSON(filePath, defaultValue) {
+    try {
+      const raw = await fs.readFile(filePath, 'utf8');
+      return JSON.parse(raw);
+    } catch (error) {
+      if (error && error.code === 'ENOENT') {
+        return defaultValue;
+      }
+      throw error;
+    }
+  }
+
+  async writeJSON(filePath, value) {
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  }
+
+  findNavItemById(items, id) {
+    for (const item of items) {
+      if (item.id === id) return item;
+      if (Array.isArray(item.children)) {
+        const child = this.findNavItemById(item.children, id);
+        if (child) return child;
+      }
+    }
+    return null;
+  }
+
+  async handleIntegrationAction(req, res, action) {
+    const body = await this.parseBody(req);
+    const handlers = {
+      sync_saved_form: this.handleIntegrationSyncSavedForm.bind(this),
+      save_manifest: this.handleIntegrationSaveManifest.bind(this),
+      upsert_nav_item: this.handleIntegrationUpsertNavItem.bind(this),
+      runtime_state: this.handleIntegrationRuntimeState.bind(this)
+    };
+
+    const handler = handlers[action];
+    if (!handler) {
+      return this.sendError(res, `Unknown integration action: ${action}`, 404);
+    }
+
+    const result = await handler(body);
+    this.sendJSON(res, {
+      success: true,
+      action,
+      result
+    });
+  }
+
+  async handleIntegrationSyncSavedForm(body) {
+    const componentId = String(body.componentId || '').trim();
+    if (!componentId) {
+      throw new Error('componentId is required');
+    }
+    if (!Array.isArray(body.schema)) {
+      throw new Error('schema must be an array');
+    }
+
+    const targetPath = this.runtimePath('generated-components.json');
+    const current = await this.readJSON(targetPath, []);
+    const next = current.filter(entry => entry.id !== componentId);
+    next.push({
+      id: componentId,
+      label: String(body.label || componentId),
+      schema: body.schema,
+      updatedAt: new Date().toISOString()
+    });
+    await this.writeJSON(targetPath, next);
+    return { saved: true, path: targetPath, total: next.length };
+  }
+
+  async handleIntegrationSaveManifest(body) {
+    const manifest = body.manifest;
+    assertValidAppManifest(manifest);
+
+    const fileName = this.sanitizeFileName(body.fileName, `${manifest.app.id}.json`);
+    const targetPath = this.runtimePath('manifests', fileName);
+    await this.writeJSON(targetPath, manifest);
+    return { saved: true, path: targetPath, fileName };
+  }
+
+  async handleIntegrationUpsertNavItem(body) {
+    const manifest = body.manifest;
+    const navItem = body.navItem;
+    const parentId = body.parentId ? String(body.parentId) : null;
+
+    assertValidAppManifest(manifest);
+    if (!navItem || typeof navItem !== 'object') {
+      throw new Error('navItem is required');
+    }
+    if (!navItem.id || !navItem.label || !navItem.componentId) {
+      throw new Error('navItem.id, navItem.label, and navItem.componentId are required');
+    }
+
+    const target = {
+      id: String(navItem.id),
+      label: String(navItem.label),
+      componentId: String(navItem.componentId),
+      events: navItem.events || undefined
+    };
+
+    let collection = manifest.navigation;
+    if (parentId) {
+      const parent = this.findNavItemById(manifest.navigation, parentId);
+      if (!parent) {
+        throw new Error(`parentId not found: ${parentId}`);
+      }
+      if (!Array.isArray(parent.children)) {
+        parent.children = [];
+      }
+      collection = parent.children;
+    }
+
+    const existingIndex = collection.findIndex(item => item.id === target.id);
+    if (existingIndex >= 0) {
+      collection[existingIndex] = { ...collection[existingIndex], ...target };
+    } else {
+      collection.push(target);
+    }
+
+    assertValidAppManifest(manifest);
+    return { saved: true, navItemId: target.id, parentId };
+  }
+
+  async handleIntegrationRuntimeState() {
+    const componentPath = this.runtimePath('generated-components.json');
+    const components = await this.readJSON(componentPath, []);
+    return {
+      generatedComponentsPath: componentPath,
+      generatedComponents: components
+    };
   }
 
   /**

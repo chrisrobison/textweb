@@ -10,7 +10,10 @@
   "scripts": {
     "start": "node src/cli.js",
     "serve": "node src/server.js",
-    "test": "node test/test-form.js && node test/test-live.js && node test/test-ats-e2e.js",
+    "test": "node test/app-runtime-manifest.js && node test/runtime-integrations.js && node test/output-modes.js && node test/test-form.js && node test/test-live.js && node test/test-ats-e2e.js",
+    "test:app-runtime": "node test/app-runtime-manifest.js",
+    "test:integrations": "node test/runtime-integrations.js",
+    "test:output": "node test/output-modes.js",
     "test:form": "node test/test-form.js",
     "test:live": "node test/test-live.js",
     "test:ats": "node test/test-ats-e2e.js"

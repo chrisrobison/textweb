@@ -16,6 +16,7 @@ function parseArgs() {
     url: null,
     interactive: false,
     json: false,
+    output: 'grid',
     serve: false,
     cols: 100,
     port: 3000,
@@ -34,7 +35,21 @@ function parseArgs() {
       case '--json':
       case '-j':
         options.json = true;
+        options.output = 'json';
         break;
+
+      case '--output':
+      case '-o': {
+        const value = (args[++i] || '').toLowerCase();
+        if (['grid', 'semantic', 'hybrid', 'json'].includes(value)) {
+          options.output = value;
+          options.json = value === 'json';
+        } else {
+          options.help = true;
+          options.error = `Invalid --output value "${value}". Expected one of: grid, semantic, hybrid, json`;
+        }
+        break;
+      }
         
       case '--serve':
       case '-s':
@@ -82,7 +97,8 @@ TextWeb - Text-grid web renderer for AI agents
 USAGE:
   textweb <url>                    Render page and print to console
   textweb --interactive <url>      Start interactive REPL mode
-  textweb --json <url>             Output as JSON (view + elements)
+  textweb --json <url>             Output as JSON (legacy: view + elements + meta)
+  textweb --output <mode> <url>    Choose output mode (grid|semantic|hybrid|json)
   textweb --serve                  Start HTTP API server
 
 OPTIONS:
@@ -91,12 +107,15 @@ OPTIONS:
   --port, -p <number>                Server port (default: 3000)
   --interactive, -i                  Interactive REPL mode
   --json, -j                         JSON output format
+  --output, -o <mode>                Output mode: grid, semantic, hybrid, json
   --serve, -s                        Start HTTP server
   --help, -h                         Show this help message
 
 EXAMPLES:
   textweb https://example.com
   textweb --interactive https://github.com
+  textweb --output semantic https://news.ycombinator.com
+  textweb --output hybrid --cols 120 https://news.ycombinator.com
   textweb --json --cols 120 https://news.ycombinator.com
   textweb --serve --port 8080
 
@@ -126,8 +145,22 @@ async function render(url, options) {
   try {
     console.error(`Rendering: ${url}`);
     const result = await browser.navigate(url);
-    
-    if (options.json) {
+
+    if (options.output === 'semantic') {
+      console.log(JSON.stringify(result.semantic || {
+        mode: 'semantic',
+        url: result.meta?.url || null,
+        title: result.meta?.title || null,
+        elements: [],
+      }, null, 2));
+    } else if (options.output === 'hybrid') {
+      console.log(JSON.stringify({
+        mode: 'hybrid',
+        view: result.view,
+        semantic: result.semantic || { mode: 'semantic', elements: [] },
+        meta: result.meta,
+      }, null, 2));
+    } else if (options.json || options.output === 'json') {
       console.log(JSON.stringify({
         view: result.view,
         elements: result.elements,
@@ -380,6 +413,7 @@ async function serve(options) {
     console.log(`  POST /type       - Type text`);
     console.log(`  POST /scroll     - Scroll page`);
     console.log(`  POST /select     - Select dropdown option`);
+    console.log(`  POST /integrations/:action - Runtime integration hook actions`);
     console.log(`  GET  /snapshot   - Get current state`);
     console.log(`  GET  /health     - Health check`);
   });
@@ -388,6 +422,11 @@ async function serve(options) {
 // Main entry point
 async function main() {
   const options = parseArgs();
+  if (options.error) {
+    console.error(`Error: ${options.error}`);
+    showHelp();
+    process.exit(1);
+  }
   
   if (options.help || (process.argv.length === 2)) {
     showHelp();
